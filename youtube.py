@@ -3,10 +3,35 @@ import os
 import json
 from datetime import datetime, timedelta
 import re
+from urllib.parse import quote
 
 def sanitize_filename(name):
     """Remove problematic characters from filenames."""
     return re.sub(r'[\\/*?:"<>|]', "_", name)
+
+def build_youtube_search_url(keyword: str, sort_by: str = "view_count", page_token: str = None) -> str:
+    """
+    Build a YouTube search URL with sorting and pagination.
+    """
+    # Map sort_by to YouTube sp codes
+    sort_map = {
+        "relevance": "CAASAhAB",
+        "view_count": "CAM%3D",
+        "upload_date": "EgQIARAB",
+        "rating": "CAE%3D"
+    }
+
+    if sort_by not in sort_map:
+        raise ValueError(f"Invalid sort_by value: {sort_by}")
+
+    sp_value = sort_map[sort_by]
+    keyword_encoded = quote(keyword)
+    url = f"https://www.youtube.com/results?search_query={keyword_encoded}&sp={sp_value}"
+
+    if page_token:
+        url += f"&page_token={page_token}"
+
+    return url
 
 def search_and_download_shorts(
     keywords,
@@ -14,12 +39,8 @@ def search_and_download_shorts(
     base_output_path="downloads/",
     days_back=2
 ):
-    """
-    Download YouTube Shorts for each keyword and save metadata.
-    Generates a single description.txt and a centralized metadata.json for videos downloaded on this run.
-    """
     cutoff_date = datetime.today() - timedelta(days=days_back)
-    cutoff_date_str = cutoff_date.strftime("%Y%m%d")  # yt-dlp date format YYYYMMDD    
+    cutoff_date_str = cutoff_date.strftime("%Y%m%d")
     today_str = datetime.today().strftime("%Y-%m-%d")
 
     all_description_lines = []
@@ -48,12 +69,12 @@ def search_and_download_shorts(
             os.makedirs(keyword_folder, exist_ok=True)
 
             downloaded = 0
-            batch_size = 10
             shorts_urls = set()
+            next_page_token = None
 
             while downloaded < target_count_per_keyword:
-                search_url = f"ytsearch{batch_size}:{keyword}"
-                print(f"Searching {batch_size} results for '{keyword}'")
+                search_url = build_youtube_search_url(keyword, sort_by="view_count", page_token=next_page_token)
+                print(f"Searching for '{keyword}' using URL: {search_url}")
 
                 try:
                     results = ydl.extract_info(search_url, download=False)
@@ -61,7 +82,6 @@ def search_and_download_shorts(
                     print(f"Search failed for '{keyword}': {e}")
                     break
 
-                # Filter Shorts <= 60s and not already downloaded
                 shorts_filtered = [
                     v for v in results.get("entries", [])
                     if v
@@ -71,22 +91,19 @@ def search_and_download_shorts(
                 ]
 
                 if not shorts_filtered:
-                    print("No Shorts found in this batch. Increasing batch size...")
-                    batch_size += 10
-                    continue
+                    print("No more Shorts found in this page.")
+                    break
 
                 # Sort by view count descending
                 shorts_sorted = sorted(shorts_filtered, key=lambda x: x.get("view_count", 0), reverse=True)
 
                 for entry in shorts_sorted:
-                    url = entry["webpage_url"]
                     if downloaded >= target_count_per_keyword:
                         break
 
+                    url = entry["webpage_url"]
                     title_safe = sanitize_filename(entry.get("title", "Untitled"))
                     outtmpl = os.path.join(keyword_folder, f"{title_safe} [{entry.get('id')}].%(ext)s")
-
-                    # Update output template for this video
                     ydl.params["outtmpl"] = outtmpl
 
                     try:
@@ -95,7 +112,6 @@ def search_and_download_shorts(
                         shorts_urls.add(url)
                         downloaded += 1
 
-                        # Prepare metadata
                         metadata_entry = {
                             "title": entry.get("title", "Untitled"),
                             "uploader": entry.get("uploader", "Unknown"),
@@ -113,11 +129,14 @@ def search_and_download_shorts(
                     except Exception as e:
                         print(f"Failed to download {url}: {e}")
 
-                batch_size += 10  # increase batch size if needed
+                # Get next page token for pagination
+                next_page_token = results.get("next_page_token")
+                if not next_page_token:
+                    break  # no more pages
 
             print(f"✅ Finished downloading {downloaded} Shorts for '{keyword}' on {today_str}")
 
-    # Save combined description.txt and metadata.json
+    # Save centralized description and metadata
     if centralized_metadata:
         description_folder = os.path.join(base_output_path, today_str)
         os.makedirs(description_folder, exist_ok=True)
