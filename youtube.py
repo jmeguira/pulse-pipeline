@@ -59,12 +59,13 @@ def search_and_download_shorts(
                 if v and v.get("duration") is not None and v.get("duration") <= 60
             ]
 
-            # Sort by view count descending
-            shorts_sorted = sorted(shorts_filtered, key=lambda x: x.get("view_count", 0), reverse=True)
+            # Sort by view count descending and keep only top N
+            shorts_sorted = sorted(shorts_filtered, key=lambda x: x.get("view_count", 0), reverse=True)[:target_count_per_keyword]
+
 
             for entry in shorts_sorted[:target_count_per_keyword]:
                 url = entry["webpage_url"]
-                outtmpl = os.path.join(keyword_folder, f"{entry.get('id')}.%(ext)s")
+                outtmpl = os.path.join(keyword_folder, f"{title_safe} [{entry.get('id')}.%(ext)s")
 
                 try:
                     print(f"Downloading Short: {entry.get('title')}")
