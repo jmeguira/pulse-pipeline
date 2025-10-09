@@ -3,6 +3,7 @@ import os
 import json
 from datetime import datetime, timedelta
 import re
+from tqdm import tqdm
 
 def sanitize_filename(name):
     """Remove problematic characters from filenames."""
@@ -43,8 +44,6 @@ def search_and_download_shorts(
             keyword_folder = os.path.join(base_output_path, keyword_safe, today_str)
             os.makedirs(keyword_folder, exist_ok=True)
 
-            downloaded = 0
-
             # Search for more results than needed to filter Shorts
             search_query = f"ytsearch{target_count_per_keyword*5}:{keyword}"
             try:
@@ -53,24 +52,30 @@ def search_and_download_shorts(
                 print(f"Search failed for '{keyword}': {e}")
                 continue
 
+            entries = results.get("entries", [])
+            if not entries:
+                print(f"No results found for '{keyword}'")
+                continue
+
             # Filter Shorts <=60s
             shorts_filtered = [
-                v for v in results.get("entries", [])
+                v for v in entries
                 if v and v.get("duration") is not None and v.get("duration") <= 60
             ]
 
             # Sort by view count descending and keep only top N
             shorts_sorted = sorted(shorts_filtered, key=lambda x: x.get("view_count", 0), reverse=True)[:target_count_per_keyword]
 
-
-            for entry in shorts_sorted[:target_count_per_keyword]:
+            # Download loop with progress bar
+            for entry in tqdm(shorts_sorted, desc=f"Downloading Shorts for '{keyword}'"):
                 url = entry["webpage_url"]
-                outtmpl = os.path.join(keyword_folder, f"{title_safe} [{entry.get('id')}.%(ext)s")
+                video_id = entry.get("id")
+                outtmpl = os.path.join(keyword_folder, f"{video_id}.%(ext)s")
 
                 try:
-                    print(f"Downloading Short: {entry.get('title')}")
-                    # Fresh YoutubeDL per video
-                    with yt_dlp.YoutubeDL({**ydl_opts_base, "outtmpl": outtmpl}) as ydl_single:
+                    print(f"\nDownloading video ID: {video_id}")
+                    # Fresh YoutubeDL per video with quiet output
+                    with yt_dlp.YoutubeDL({**ydl_opts_base, "outtmpl": outtmpl, "quiet": True, "no_warnings": True}) as ydl_single:
                         ydl_single.download([url])
 
                     # Metadata
@@ -91,9 +96,8 @@ def search_and_download_shorts(
                 except Exception as e:
                     print(f"Failed to download {url}: {e}")
 
-                downloaded += 1
 
-            print(f"✅ Finished downloading {downloaded} Shorts for '{keyword}' on {today_str}")
+            print(f"✅ Finished downloading {len(shorts_sorted)} Shorts for '{keyword}' on {today_str}")
 
     # Save centralized description and metadata
     if centralized_metadata:
