@@ -3,35 +3,10 @@ import os
 import json
 from datetime import datetime, timedelta
 import re
-from urllib.parse import quote
 
 def sanitize_filename(name):
     """Remove problematic characters from filenames."""
     return re.sub(r'[\\/*?:"<>|]', "_", name)
-
-def build_youtube_search_url(keyword: str, sort_by: str = "view_count", page_token: str = None) -> str:
-    """
-    Build a YouTube search URL with sorting and pagination.
-    """
-    # Map sort_by to YouTube sp codes
-    sort_map = {
-        "relevance": "CAASAhAB",
-        "view_count": "CAM%3D",
-        "upload_date": "EgQIARAB",
-        "rating": "CAE%3D"
-    }
-
-    if sort_by not in sort_map:
-        raise ValueError(f"Invalid sort_by value: {sort_by}")
-
-    sp_value = sort_map[sort_by]
-    keyword_encoded = quote(keyword)
-    url = f"https://www.youtube.com/results?search_query={keyword_encoded}&sp={sp_value}"
-
-    if page_token:
-        url += f"&page_token={page_token}"
-
-    return url
 
 def search_and_download_shorts(
     keywords,
@@ -46,7 +21,8 @@ def search_and_download_shorts(
     all_description_lines = []
     centralized_metadata = []
 
-    ydl_opts = {
+    # Base options
+    ydl_opts_base = {
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "noplaylist": True,
         "quiet": False,
@@ -57,11 +33,10 @@ def search_and_download_shorts(
         "sleep_interval_requests": 0,
         "max_sleep_interval": 5,
         "merge_output_format": "mp4",
-        "writeinfojson": True,
         "dateafter": cutoff_date_str,
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts_base) as ydl:
         for keyword in keywords:
             print(f"\n🔍 Searching for keyword: '{keyword}'")
             keyword_safe = sanitize_filename(keyword)
@@ -69,70 +44,53 @@ def search_and_download_shorts(
             os.makedirs(keyword_folder, exist_ok=True)
 
             downloaded = 0
-            shorts_urls = set()
-            next_page_token = None
 
-            while downloaded < target_count_per_keyword:
-                search_url = build_youtube_search_url(keyword, sort_by="view_count", page_token=next_page_token)
-                print(f"Searching for '{keyword}' using URL: {search_url}")
+            # Search for more results than needed to filter Shorts
+            search_query = f"ytsearch{target_count_per_keyword*5}:{keyword}"
+            try:
+                results = ydl.extract_info(search_query, download=False)
+            except Exception as e:
+                print(f"Search failed for '{keyword}': {e}")
+                continue
+
+            # Filter Shorts <=60s
+            shorts_filtered = [
+                v for v in results.get("entries", [])
+                if v and v.get("duration") is not None and v.get("duration") <= 60
+            ]
+
+            # Sort by view count descending
+            shorts_sorted = sorted(shorts_filtered, key=lambda x: x.get("view_count", 0), reverse=True)
+
+            for entry in shorts_sorted[:target_count_per_keyword]:
+                url = entry["webpage_url"]
+                outtmpl = os.path.join(keyword_folder, f"{entry.get('id')}.%(ext)s")
 
                 try:
-                    results = ydl.extract_info(search_url, download=False)
+                    print(f"Downloading Short: {entry.get('title')}")
+                    # Fresh YoutubeDL per video
+                    with yt_dlp.YoutubeDL({**ydl_opts_base, "outtmpl": outtmpl}) as ydl_single:
+                        ydl_single.download([url])
+
+                    # Metadata
+                    metadata_entry = {
+                        "title": entry.get("title", "Untitled"),
+                        "uploader": entry.get("uploader", "Unknown"),
+                        "url": url,
+                        "upload_date": entry.get("upload_date"),
+                        "view_count": entry.get("view_count"),
+                        "duration": entry.get("duration"),
+                        "keywords": keyword,
+                        "file_path": outtmpl
+                    }
+                    centralized_metadata.append(metadata_entry)
+                    all_description_lines.append(
+                        f"{metadata_entry['title']} - by {metadata_entry['uploader']} ({metadata_entry['url']})"
+                    )
                 except Exception as e:
-                    print(f"Search failed for '{keyword}': {e}")
-                    break
+                    print(f"Failed to download {url}: {e}")
 
-                shorts_filtered = [
-                    v for v in results.get("entries", [])
-                    if v
-                    and v.get("duration") is not None
-                    and v.get("duration") <= 60
-                    and v.get("webpage_url") not in shorts_urls
-                ]
-
-                if not shorts_filtered:
-                    print("No more Shorts found in this page.")
-                    break
-
-                # Sort by view count descending
-                shorts_sorted = sorted(shorts_filtered, key=lambda x: x.get("view_count", 0), reverse=True)
-
-                for entry in shorts_sorted:
-                    if downloaded >= target_count_per_keyword:
-                        break
-
-                    url = entry["webpage_url"]
-                    title_safe = sanitize_filename(entry.get("title", "Untitled"))
-                    outtmpl = os.path.join(keyword_folder, f"{title_safe} [{entry.get('id')}].%(ext)s")
-                    ydl.params["outtmpl"] = outtmpl
-
-                    try:
-                        print(f"Downloading Short: {entry.get('title')}")
-                        ydl.download([url])
-                        shorts_urls.add(url)
-                        downloaded += 1
-
-                        metadata_entry = {
-                            "title": entry.get("title", "Untitled"),
-                            "uploader": entry.get("uploader", "Unknown"),
-                            "url": url,
-                            "upload_date": entry.get("upload_date"),
-                            "view_count": entry.get("view_count"),
-                            "duration": entry.get("duration"),
-                            "keywords": keyword,
-                            "file_path": outtmpl
-                        }
-                        centralized_metadata.append(metadata_entry)
-                        all_description_lines.append(
-                            f"{metadata_entry['title']} - by {metadata_entry['uploader']} ({metadata_entry['url']})"
-                        )
-                    except Exception as e:
-                        print(f"Failed to download {url}: {e}")
-
-                # Get next page token for pagination
-                next_page_token = results.get("next_page_token")
-                if not next_page_token:
-                    break  # no more pages
+                downloaded += 1
 
             print(f"✅ Finished downloading {downloaded} Shorts for '{keyword}' on {today_str}")
 
@@ -153,6 +111,6 @@ def search_and_download_shorts(
 
 
 if __name__ == "__main__":
-    keywords = ["funny cats", "fails"]
-    target_count_per_keyword = 3
+    keywords = ["cat"]
+    target_count_per_keyword = 15
     search_and_download_shorts(keywords, target_count_per_keyword)
