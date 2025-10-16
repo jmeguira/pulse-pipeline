@@ -6,8 +6,16 @@ from tqdm import tqdm
 from googleapiclient.discovery import build
 import isodate
 import yt_dlp
+from pprint import pprint
+from dotenv import load_dotenv
 
-API_KEY = "AIzaSyDo7rQboCzNGx8OlEuHkcickWZ7sgkxUnA"
+"""Load environment variables"""
+load_dotenv()
+API_KEY = os.getenv("YOUTUBE_API_KEY")
+
+if not API_KEY:
+    raise RuntimeError("Missing YOUTUBE_API_KEY. Set it in .env or your environment.")
+
 
 def clean_title(text: str) -> str:
     """Remove hashtags and extra whitespace from a title."""
@@ -15,52 +23,115 @@ def clean_title(text: str) -> str:
     cleaned = re.sub(r"\s+", " ", no_tags).strip()
     return cleaned
 
-def fetch_youtube_shorts(keyword: str, max_results=50, days_back=2):
+
+def fetch_youtube_shorts(keyword: str, target_count=5, days_back=2, batch_size=50):
     """
     Fetch metadata for YouTube Shorts under 60s, not age-restricted, sorted by view count.
+    Attempts multiple batches to reach target_count, fails gracefully if not enough videos.
+    Only includes videos where the cleaned title contains the keyword.
     """
     youtube = build("youtube", "v3", developerKey=API_KEY)
     cutoff_date = (datetime.utcnow() - timedelta(days=days_back)).isoformat("T") + "Z"
 
-    # 1️⃣ Search for videos by keyword, sorted by view count
-    search_response = youtube.search().list(
-        q=keyword,
-        type="video",
-        part="id",
-        maxResults=max_results,
-        publishedAfter=cutoff_date,
-        order="viewCount"
-    ).execute()
+    shorts_collected = []
+    next_page_token = None
+    batch_number = 1
 
-    video_ids = [item["id"]["videoId"] for item in search_response.get("items", [])]
-    if not video_ids:
-        return []
+    print(f"🔍 Fetching Shorts for keyword '{keyword}' (target: {target_count})")
 
-    # 2️⃣ Fetch video details (duration, uploader, stats)
-    videos_response = youtube.videos().list(
-        part="snippet,contentDetails,statistics",
-        id=",".join(video_ids)
-    ).execute()
+    while len(shorts_collected) < target_count:
+        print(f"  ➤ Fetching batch #{batch_number} (already collected: {len(shorts_collected)})")
 
-    shorts = []
-    for video in videos_response.get("items", []):
-        duration_sec = int(isodate.parse_duration(video["contentDetails"]["duration"]).total_seconds())
-        age_restricted = video["contentDetails"].get("contentRating", {}).get("ytRating") == "ytAgeRestricted"
+        try:
+            search_response = (
+                youtube.search()
+                .list(
+                    q=keyword,
+                    type="video",
+                    part="id",
+                    maxResults=batch_size,
+                    publishedAfter=cutoff_date,
+                    order="viewCount",
+                    pageToken=next_page_token,
+                )
+                .execute()
+            )
+        except Exception as e:
+            print(f"    ❌ Search failed on batch #{batch_number}: {e}")
+            break
 
-        if duration_sec <= 60 and not age_restricted:
-            shorts.append({
-                "id": video["id"],
-                "title": video["snippet"]["title"],
-                "uploader": video["snippet"]["channelTitle"],
-                "url": f"https://www.youtube.com/watch?v={video['id']}",
-                "upload_date": video["snippet"]["publishedAt"],
-                "view_count": int(video["statistics"].get("viewCount", 0)),
-                "duration": duration_sec
-            })
+        video_ids = [item["id"]["videoId"] for item in search_response.get("items", [])]
+        if not video_ids:
+            print(f"    ⚠ No videos returned in batch #{batch_number}")
+            break
 
-    return shorts
+        try:
+            videos_response = (
+                youtube.videos()
+                .list(part="snippet,contentDetails,statistics", id=",".join(video_ids))
+                .execute()
+            )
+        except Exception as e:
+            print(f"    ❌ Failed to fetch video details on batch #{batch_number}: {e}")
+            break
 
-def search_and_download_shorts(keywords, target_count_per_keyword=5, base_output_path="downloads/", days_back=2):
+        shorts_in_batch = []
+        for video in videos_response.get("items", []):
+            duration_sec = int(
+                isodate.parse_duration(video["contentDetails"]["duration"]).total_seconds()
+            )
+            age_restricted = (
+                video["contentDetails"].get("contentRating", {}).get("ytRating")
+                == "ytAgeRestricted"
+            )
+            title_cleaned = clean_title(video["snippet"]["title"])
+
+            # Only include if duration <=60s, not age-restricted, and keyword is in cleaned title
+            if (
+                duration_sec <= 60
+                and not age_restricted
+                and keyword.lower() in title_cleaned.lower()
+            ):
+                shorts_in_batch.append(
+                    {
+                        "id": video["id"],
+                        "title": video["snippet"]["title"],
+                        "uploader": video["snippet"]["channelTitle"],
+                        "url": f"https://www.youtube.com/watch?v={video['id']}",
+                        "upload_date": video["snippet"]["publishedAt"],
+                        "view_count": int(video["statistics"].get("viewCount", 0)),
+                        "duration": duration_sec,
+                    }
+                )
+
+        print(f"    ➤ Batch #{batch_number} found {len(shorts_in_batch)} valid Shorts")
+        shorts_collected.extend(shorts_in_batch)
+
+        # Prepare for next batch
+        next_page_token = search_response.get("nextPageToken")
+        if not next_page_token:
+            print(f"    ⚠ No more pages available for '{keyword}'")
+            break
+
+        batch_number += 1
+
+    if len(shorts_collected) >= target_count:
+        print(f"✅ Collected {len(shorts_collected)} Shorts for '{keyword}'")
+    else:
+        print(
+            f"⚠ Only {len(shorts_collected)} Shorts found for '{keyword}', less than target {target_count}"
+        )
+
+    # Sort by view count and slice to target_count
+    shorts_collected = sorted(shorts_collected, key=lambda x: x["view_count"], reverse=True)[
+        :target_count
+    ]
+    return shorts_collected
+
+
+def search_and_download_shorts(
+    keywords, target_count_per_keyword=5, base_output_path="downloads/", days_back=2
+):
     today_str = datetime.today().strftime("%Y-%m-%d")
 
     ydl_opts_base = {
@@ -80,17 +151,21 @@ def search_and_download_shorts(keywords, target_count_per_keyword=5, base_output
     with yt_dlp.YoutubeDL(ydl_opts_base) as ydl:
         for keyword in keywords:
             print(f"\n🔍 Searching for keyword: '{keyword}'")
-            keyword_folder = os.path.join(base_output_path, keyword_safe, today_str)
+            keyword_folder = os.path.join(base_output_path, keyword, today_str)
             os.makedirs(keyword_folder, exist_ok=True)
 
             # Fetch metadata from YouTube Data API
-            shorts = fetch_youtube_shorts(keyword, max_results=target_count_per_keyword * 3, days_back=days_back)
+            shorts = fetch_youtube_shorts(
+                keyword, target_count=target_count_per_keyword, days_back=days_back
+            )
             if not shorts:
                 print(f"No Shorts found for '{keyword}'")
                 continue
 
             # Sort by view count descending, then slice to target
-            shorts_sorted = sorted(shorts, key=lambda x: x["view_count"], reverse=True)[:target_count_per_keyword]
+            shorts_sorted = sorted(shorts, key=lambda x: x["view_count"], reverse=True)[
+                :target_count_per_keyword
+            ]
 
             all_description_lines = []
             centralized_metadata = []
@@ -102,12 +177,14 @@ def search_and_download_shorts(keywords, target_count_per_keyword=5, base_output
                 outtmpl = os.path.join(keyword_folder, f"{video_id}.%(ext)s")
 
                 try:
-                    with yt_dlp.YoutubeDL({
-                        **ydl_opts_base,
-                        "outtmpl": outtmpl,
-                        "quiet": True,
-                        "no_warnings": True
-                    }) as ydl_single:
+                    with yt_dlp.YoutubeDL(
+                        {
+                            **ydl_opts_base,
+                            "outtmpl": outtmpl,
+                            "quiet": True,
+                            "no_warnings": True,
+                        }
+                    ) as ydl_single:
                         ydl_single.download([url])
 
                     metadata_entry = {
@@ -118,7 +195,7 @@ def search_and_download_shorts(keywords, target_count_per_keyword=5, base_output
                         "view_count": entry["view_count"],
                         "duration": entry["duration"],
                         "keywords": keyword,
-                        "file_path": outtmpl
+                        "file_path": outtmpl,
                     }
                     centralized_metadata.append(metadata_entry)
                     all_description_lines.append(
@@ -128,7 +205,9 @@ def search_and_download_shorts(keywords, target_count_per_keyword=5, base_output
                 except Exception as e:
                     print(f"Failed to download {url}: {e}")
 
-            print(f"✅ Finished downloading {len(shorts_sorted)} Shorts for '{keyword}' on {today_str}")
+            print(
+                f"✅ Finished downloading {len(shorts_sorted)} Shorts for '{keyword}' on {today_str}"
+            )
 
             # --- Save metadata/description per keyword ---
             if centralized_metadata:
@@ -145,5 +224,5 @@ def search_and_download_shorts(keywords, target_count_per_keyword=5, base_output
 
 if __name__ == "__main__":
     keywords = ["cat", "fail"]
-    target_count_per_keyword = 3
+    target_count_per_keyword = 5
     search_and_download_shorts(keywords, target_count_per_keyword)
