@@ -142,7 +142,6 @@ def search_and_download_shorts(
     ydl_opts_base = {
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "noplaylist": True,
-        "quiet": False,
         "ignoreerrors": True,
         "cookiefile": "cookies.txt",
         "download_archive": "downloaded.txt",
@@ -151,6 +150,9 @@ def search_and_download_shorts(
         "max_sleep_interval": 5,
         "merge_output_format": "mp4",
         "age_limit": 18,
+        # Suppress all normal output; errors will still be shown
+        "quiet": True,
+        "no_warnings": True,
     }
 
     for keyword in keywords:
@@ -167,13 +169,15 @@ def search_and_download_shorts(
         all_description_lines = []
         centralized_metadata = []
 
-        with yt_dlp.YoutubeDL(ydl_opts_base) as ydl:
+        # Use one YoutubeDL instance per batch, specifying the folder template
+        ydl_opts = {**ydl_opts_base, "outtmpl": os.path.join(keyword_folder, "%(id)s.%(ext)s")}
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             for entry in tqdm(shorts, desc=f"Downloading Shorts for '{keyword}'"):
-                outtmpl = os.path.join(keyword_folder, f"{entry['id']}.%(ext)s")
                 try:
                     ydl.download([entry["url"]])
                 except Exception as e:
-                    print(f"Failed to download {entry['url']}: {e}")
+                    print(f"❌ Failed to download {entry['url']}: {e}")
                     continue
 
                 metadata_entry = {
@@ -184,7 +188,7 @@ def search_and_download_shorts(
                     "view_count": entry["view_count"],
                     "duration": entry["duration"],
                     "keywords": keyword,
-                    "file_path": outtmpl,
+                    "file_path": os.path.join(keyword_folder, f"{entry['id']}.mp4"),
                 }
 
                 centralized_metadata.append(metadata_entry)
@@ -192,16 +196,18 @@ def search_and_download_shorts(
                     f"{metadata_entry['title']} - by {metadata_entry['uploader']} ({metadata_entry['url']})"
                 )
 
-        # Save description & metadata
+        # Save description & metadata if any videos were downloaded
         if centralized_metadata:
             desc_file = os.path.join(keyword_folder, "description.txt")
             metadata_file = os.path.join(keyword_folder, "metadata.json")
+
             with open(desc_file, "w", encoding="utf-8") as f:
                 f.write("\n".join(all_description_lines))
+
             with open(metadata_file, "w", encoding="utf-8") as f:
                 json.dump(centralized_metadata, f, indent=4)
 
-            print(f"✅ Finished '{keyword}' — {len(shorts)} Shorts saved")
+            print(f"✅ Finished '{keyword}' — {len(shorts)} Shorts saved in {keyword_folder}")
 
 
 if __name__ == "__main__":
