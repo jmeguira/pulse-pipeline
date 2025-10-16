@@ -8,6 +8,7 @@ import isodate
 import yt_dlp
 from pprint import pprint
 from dotenv import load_dotenv
+import string
 
 """Load environment variables"""
 load_dotenv()
@@ -18,9 +19,23 @@ if not API_KEY:
 
 
 def clean_title(text: str) -> str:
-    """Remove hashtags and extra whitespace from a title."""
-    no_tags = re.sub(r"#\S+", "", text)
-    cleaned = re.sub(r"\s+", " ", no_tags).strip()
+    """
+    Remove hashtags, emojis, and most punctuation for a clean plain-text description.
+    Keeps only letters, numbers, spaces, and basic punctuation (.,-)
+    """
+    # 1. Remove hashtags
+    cleaned = re.sub(r"#\S+", "", text)
+
+    # 2. Remove emojis and non-ASCII symbols
+    cleaned = re.sub(r"[^\x00-\x7F]", "", cleaned)
+
+    # 3. Remove most punctuation except basic sentence punctuation
+    allowed = set(string.ascii_letters + string.digits + " .,")
+    cleaned = "".join(c if c in allowed else " " for c in cleaned)
+
+    # 4. Collapse multiple spaces
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
     return cleaned
 
 
