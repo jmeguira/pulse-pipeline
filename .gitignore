@@ -3,3 +3,7 @@ downloads/
 downloaded.txt
 cookies.txt
 .DS_Store
+*.mp4
+*.wav
+*.mp3
+transition_sounds/
