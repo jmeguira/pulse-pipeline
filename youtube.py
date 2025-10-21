@@ -185,8 +185,23 @@ def create_compilation(
 
     for idx, video in enumerate(videos):
         try:
-            clip = VideoFileClip(video["file_path"])
-            clip = clip.with_effects([vfx.Resize((output_width, output_height))])
+            clip = VideoFileClip(video["file_path"]).resized(height=output_height)
+
+            """# --- Resize and add blurred background for vertical videos --- #
+                                                if clip.w < clip.h:
+                                                    fg = clip.resized(height=output_height)
+                                                    bg = clip.resized(width=output_width).with_opacity(.2)
+                                                    # Apply HeadBlur centered on the middle of the frame
+                                                    fx = lambda t: bg.w / 2
+                                                    fy = lambda t: bg.h / 2
+                                                    radius = 2300
+                                                    intensity = 5.0  # optional, can tweak                
+                                    
+                                                    #bg = clip.with_effects([vfx.HeadBlur(fx=fx, fy=fy, radius=radius, intensity=intensity)])
+                                                    clip = CompositeVideoClip([bg.with_position(("center", "top")), fg.with_position(("center", "top"))], size=(output_width,output_height))
+                                                else:    
+                                                    clip = clip.resized(height=output_height)"""
+
             clips.append(clip)
 
         except Exception as e:
@@ -197,7 +212,7 @@ def create_compilation(
         return
 
     # --- Concatenate all clips ---
-    """final = concatenate_videoclips(clips, method="compose")
+    final = concatenate_videoclips(clips, method="compose")
     final.write_videofile(
         output_path,
         fps=30,
@@ -205,7 +220,7 @@ def create_compilation(
         audio_codec="aac",
         bitrate="8000k",
         threads=4,
-    )"""
+    )
 
     print(f"✅ Compilation created: {output_path}")
 
@@ -336,5 +351,5 @@ def search_and_download_shorts(
 # -------------------------
 if __name__ == "__main__":
     keywords = ["cat"]
-    target_count_per_keyword = 3
+    target_count_per_keyword = 1
     search_and_download_shorts(keywords, target_count_per_keyword)
