@@ -7,3 +7,7 @@ cookies.txt
 *.wav
 *.mp3
 transition_sounds/
+
+# PyCharm
+.idea/
+*.iml
