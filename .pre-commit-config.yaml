@@ -1,6 +1,22 @@
 repos:
-  - repo: https://github.com/psf/black
-    rev: 24.8.0  # latest stable as of now
+
+  # -------------------------
+  # Flake8 linter
+  # -------------------------
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
     hooks:
-      - id: black
-        args: ["--line-length=100"]
+      - id: flake8
+        args:
+          - --max-line-length=100
+          - --ignore=E126,E203,W503
+          - --exclude=.venv,__pycache__,build,dist
+
+  # -------------------------
+  # Optional hygiene hooks
+  # -------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer

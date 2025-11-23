@@ -1,24 +1,20 @@
-import os
 import json
-from datetime import datetime, timedelta
+import os
 import re
-from tqdm import tqdm
-from googleapiclient.discovery import build
+import string
+from datetime import datetime, timedelta
+
 import isodate
 import yt_dlp
-from pprint import pprint
 from dotenv import load_dotenv
-import string
-import random
+from googleapiclient.discovery import build
 from moviepy import (
     VideoFileClip,
-    AudioFileClip,
-    CompositeVideoClip,
     ColorClip,
-    TextClip,
     concatenate_videoclips,
     vfx,
 )
+from tqdm import tqdm
 
 """Load environment variables"""
 load_dotenv()
@@ -76,7 +72,7 @@ def fetch_youtube_shorts(keyword: str, target_count=5, days_back=2, batch_size=5
 
         video_ids = [item["id"]["videoId"] for item in search_resp.get("items", [])]
         if not video_ids:
-            print(f"    ⚠ No videos found in this batch")
+            print("    ⚠ No videos found in this batch")
             break
 
         try:
@@ -149,6 +145,7 @@ def create_compilation(
     folder = os.path.join(base_output_path, keyword, today_str)
     metadata_path = os.path.join(folder, "metadata.json")
     output_path = os.path.join(folder, f"{keyword}_compilation.mp4")
+    transition_duration = 1.5
 
     if not os.path.exists(metadata_path):
         print(f"⚠ No metadata.json found for '{keyword}', skipping compilation.")
@@ -166,6 +163,8 @@ def create_compilation(
     for video in videos:
         print(f"Video: {video['title']}, view_count: {video['view_count']}")
 
+    transition_clip = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=transition_duration)
+
     clips = []
 
     # --- Title Card ---
@@ -173,36 +172,23 @@ def create_compilation(
         title_clip = VideoFileClip(title_card_path)
         title_clip = title_clip.with_effects([vfx.Resize((output_width, output_height))])
         clips.append(title_clip)
+        clips.append(transition_clip)
     else:
         print(f"⚠ No title card found at {title_card_path}")
 
     # --- Transition Sounds ---
-    transition_sounds = [
-        os.path.join(transition_sounds_path, f)
-        for f in os.listdir(transition_sounds_path)
-        if f.lower().endswith((".mp3", ".wav"))
-    ]
+    # transition_sounds = [
+    #     os.path.join(transition_sounds_path, f)
+    #     for f in os.listdir(transition_sounds_path)
+    #     if f.lower().endswith((".mp3", ".wav"))
+    # ]
 
     for idx, video in enumerate(videos):
         try:
             clip = VideoFileClip(video["file_path"]).resized(height=output_height)
 
-            """# --- Resize and add blurred background for vertical videos --- #
-                                                if clip.w < clip.h:
-                                                    fg = clip.resized(height=output_height)
-                                                    bg = clip.resized(width=output_width).with_opacity(.2)
-                                                    # Apply HeadBlur centered on the middle of the frame
-                                                    fx = lambda t: bg.w / 2
-                                                    fy = lambda t: bg.h / 2
-                                                    radius = 2300
-                                                    intensity = 5.0  # optional, can tweak                
-                                    
-                                                    #bg = clip.with_effects([vfx.HeadBlur(fx=fx, fy=fy, radius=radius, intensity=intensity)])
-                                                    clip = CompositeVideoClip([bg.with_position(("center", "top")), fg.with_position(("center", "top"))], size=(output_width,output_height))
-                                                else:    
-                                                    clip = clip.resized(height=output_height)"""
-
             clips.append(clip)
+            clips.append(transition_clip)
 
         except Exception as e:
             print(f"⚠ Failed to process {video['file_path']}: {e}")
@@ -212,7 +198,10 @@ def create_compilation(
         return
 
     # --- Concatenate all clips ---
-    final = concatenate_videoclips(clips, method="compose")
+    final = concatenate_videoclips(
+        clips,
+        method="compose",
+    )
     final.write_videofile(
         output_path,
         fps=30,
@@ -238,7 +227,6 @@ def search_and_download_shorts(
         "noplaylist": True,
         "ignoreerrors": True,
         "cookiefile": "cookies.txt",
-        "download_archive": "downloaded.txt",
         "retries": 3,
         "sleep_interval_requests": 0,
         "max_sleep_interval": 5,
@@ -246,7 +234,6 @@ def search_and_download_shorts(
         "age_limit": 18,
         "quiet": True,
         "no_warnings": True,
-        "nocheckcertificate": True,
     }
 
     for keyword in keywords:
@@ -270,9 +257,7 @@ def search_and_download_shorts(
 
         # --- Skip fetching if enough videos exist ---
         if len(existing_videos) >= target_count_per_keyword:
-            print(
-                f"✅ Found {len(existing_videos)} existing videos for '{keyword}', skipping fetch/download."
-            )
+            print(f"✅ Found {len(existing_videos)} existing videos for '{keyword}'.")
             create_compilation(
                 keyword=keyword,
                 title_card_path="title_card.mp4",
@@ -319,7 +304,8 @@ def search_and_download_shorts(
                 }
                 centralized_metadata.append(metadata_entry)
                 all_description_lines.append(
-                    f"{metadata_entry['title']} - by {metadata_entry['uploader']} ({metadata_entry['url']})"
+                    f"{metadata_entry['title']} - by {metadata_entry['uploader']}"
+                    f" ({metadata_entry['url']})"
                 )
 
         if centralized_metadata:
@@ -351,5 +337,5 @@ def search_and_download_shorts(
 # -------------------------
 if __name__ == "__main__":
     keywords = ["cat"]
-    target_count_per_keyword = 1
+    target_count_per_keyword = 2
     search_and_download_shorts(keywords, target_count_per_keyword)
