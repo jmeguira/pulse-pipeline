@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import re
 import string
 from datetime import datetime, timedelta
@@ -9,9 +10,11 @@ import yt_dlp
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 from moviepy import (
+    AudioFileClip,
     VideoFileClip,
     ColorClip,
     concatenate_videoclips,
+    afx,
     vfx,
 )
 from tqdm import tqdm
@@ -35,6 +38,21 @@ def clean_title(text: str) -> str:
     cleaned = "".join(c if c in allowed else " " for c in cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
+
+
+def transform_clip(clip: VideoFileClip = None) -> VideoFileClip:
+    speed_factor = 1 + random.uniform(0.025, 0.05)
+    tint_factor = 1 + random.uniform(-0.05, 0.1)
+    pan_factor = random.uniform(-0.1, 0.1)
+    left = 1 - pan_factor
+    right = 1 + pan_factor
+
+    effects = [vfx.MultiplySpeed(factor=speed_factor), vfx.MultiplyColor(factor=tint_factor)]
+
+    if clip.audio and clip.audio.nchannels == 2:
+        effects.append(afx.MultiplyStereoVolume(left=left, right=right))
+
+    return clip.with_effects(effects)
 
 
 # -------------------------
@@ -90,14 +108,14 @@ def fetch_youtube_shorts(keyword: str, target_count=5, days_back=2, batch_size=5
                 isodate.parse_duration(video["contentDetails"]["duration"]).total_seconds()
             )
             age_restricted = (
-                video["contentDetails"].get("contentRating", {}).get("ytRating")
-                == "ytAgeRestricted"
+                    video["contentDetails"].get("contentRating", {}).get("ytRating")
+                    == "ytAgeRestricted"
             )
             title_cleaned = clean_title(video["snippet"]["title"])
             if (
-                duration_sec <= 60
-                and not age_restricted
-                and keyword.lower() in title_cleaned.lower()
+                    duration_sec <= 60
+                    and not age_restricted
+                    and keyword.lower() in title_cleaned.lower()
             ):
                 shorts_collected.append(
                     {
@@ -125,13 +143,12 @@ def fetch_youtube_shorts(keyword: str, target_count=5, days_back=2, batch_size=5
 # --- Video Compilation ---
 # -------------------------
 def create_compilation(
-    keyword,
-    base_output_path="downloads/",
-    title_card_path="title_card.mp4",
-    transition_sounds_path="transitions/",
-    channel_name="HashtagSoup",
-    output_width=1920,
-    output_height=1080,
+        keyword,
+        base_output_path="downloads/",
+        title_card_path="title_card.mp4",
+        transition_sound_path="pop.wav",
+        output_width=1920,
+        output_height=1080,
 ):
     """
     Creates a horizontal (16:9) compilation video:
@@ -145,7 +162,7 @@ def create_compilation(
     folder = os.path.join(base_output_path, keyword, today_str)
     metadata_path = os.path.join(folder, "metadata.json")
     output_path = os.path.join(folder, f"{keyword}_compilation.mp4")
-    transition_duration = 1.5
+    transition_duration = 1
 
     if not os.path.exists(metadata_path):
         print(f"⚠ No metadata.json found for '{keyword}', skipping compilation.")
@@ -163,7 +180,18 @@ def create_compilation(
     for video in videos:
         print(f"Video: {video['title']}, view_count: {video['view_count']}")
 
-    transition_clip = ColorClip(size=(1920, 1080), color=(0, 0, 0), duration=transition_duration)
+    if os.path.exists(transition_sound_path):
+        transition_sound_clip = AudioFileClip(transition_sound_path).subclipped(
+            0, transition_duration
+        )
+
+        transition_clip = ColorClip(
+            size=(1920, 1080), color=(0, 0, 0), duration=transition_duration
+        )
+        transition_clip = transition_clip.with_audio(transition_sound_clip)
+    else:
+        print(f"⚠ No transition audio found at  at {transition_sound_path}")
+        return
 
     clips = []
 
@@ -172,20 +200,14 @@ def create_compilation(
         title_clip = VideoFileClip(title_card_path)
         title_clip = title_clip.with_effects([vfx.Resize((output_width, output_height))])
         clips.append(title_clip)
-        clips.append(transition_clip)
     else:
         print(f"⚠ No title card found at {title_card_path}")
-
-    # --- Transition Sounds ---
-    # transition_sounds = [
-    #     os.path.join(transition_sounds_path, f)
-    #     for f in os.listdir(transition_sounds_path)
-    #     if f.lower().endswith((".mp3", ".wav"))
-    # ]
+        return
 
     for idx, video in enumerate(videos):
         try:
             clip = VideoFileClip(video["file_path"]).resized(height=output_height)
+            clip = transform_clip(clip)
 
             clips.append(clip)
             clips.append(transition_clip)
@@ -218,7 +240,7 @@ def create_compilation(
 # --- Main Download & Compile ---
 # -------------------------
 def search_and_download_shorts(
-    keywords, target_count_per_keyword=5, base_output_path="downloads/", days_back=2
+        keywords, target_count_per_keyword=5, base_output_path="downloads/", days_back=2
 ):
     today_str = datetime.today().strftime("%Y-%m-%d")
 
@@ -246,7 +268,7 @@ def search_and_download_shorts(
         if os.path.exists(os.path.join(keyword_folder, "metadata.json")):
             try:
                 with open(
-                    os.path.join(keyword_folder, "metadata.json"), "r", encoding="utf-8"
+                        os.path.join(keyword_folder, "metadata.json"), "r", encoding="utf-8"
                 ) as f:
                     existing_videos = json.load(f)
             except Exception as e:
@@ -262,19 +284,12 @@ def search_and_download_shorts(
                 keyword=keyword,
                 title_card_path="title_card.mp4",
                 base_output_path=base_output_path,
-                transition_sounds_path="transition_sounds/",
-                channel_name="HashtagSoup",
+                transition_sound_path="pop.wav",
             )
             continue
 
         # --- Otherwise fetch new videos ---
         print(f"⬇ Fetching new Shorts for '{keyword}'...")
-        shorts = fetch_youtube_shorts(keyword, target_count_per_keyword, days_back)
-        if not shorts:
-            print(f"No Shorts found for '{keyword}'")
-            continue
-
-        # Fetch metadata
         shorts = fetch_youtube_shorts(keyword, target_count_per_keyword, days_back)
         if not shorts:
             print(f"No Shorts found for '{keyword}'")
@@ -325,8 +340,7 @@ def search_and_download_shorts(
                     keyword=keyword,
                     title_card_path=title_card_path,
                     base_output_path=base_output_path,
-                    transition_sounds_path="transition_sounds/",
-                    channel_name="HashtagSoup",
+                    transition_sound_path="pop.wav",
                 )
             except Exception as e:
                 print(f"⚠ Failed to create compilation for '{keyword}': {e}")
