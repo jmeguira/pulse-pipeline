@@ -6,6 +6,7 @@ import string
 from datetime import datetime, timedelta
 
 import isodate
+import numpy as np
 import yt_dlp
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
@@ -16,6 +17,8 @@ from moviepy import (
     concatenate_videoclips,
     afx,
     vfx,
+    TextClip,
+    CompositeVideoClip,
 )
 from tqdm import tqdm
 
@@ -53,6 +56,23 @@ def transform_clip(clip: VideoFileClip = None) -> VideoFileClip:
         effects.append(afx.MultiplyStereoVolume(left=left, right=right))
 
     return clip.with_effects(effects)
+
+
+def get_peak(audio: AudioFileClip) -> float:
+    sound = audio.to_soundarray(fps=44100)
+    return np.abs(sound).max()
+
+
+def normalize_clip_audio(clip: VideoFileClip = None, target_peak: float = 0.9) -> VideoFileClip:
+    if clip.audio is None:
+        return clip
+
+    peak = get_peak(clip.audio)
+    if peak == 0:
+        return clip
+
+    factor = target_peak / peak
+    return clip.with_volume_scaled(factor=factor)
 
 
 # -------------------------
@@ -175,8 +195,8 @@ def create_compilation(
         print(f"⚠ No videos found in metadata for '{keyword}'.")
         return
 
-    # Sort videos by view count descending
-    videos.sort(key=lambda v: v["view_count"], reverse=True)
+    # Sort videos by view count ascending
+    videos.sort(key=lambda v: v["view_count"])
     for video in videos:
         print(f"Video: {video['title']}, view_count: {video['view_count']}")
 
@@ -199,18 +219,38 @@ def create_compilation(
     if os.path.exists(title_card_path):
         title_clip = VideoFileClip(title_card_path)
         title_clip = title_clip.with_effects([vfx.Resize((output_width, output_height))])
+        title_clip = normalize_clip_audio(title_clip)
         clips.append(title_clip)
     else:
         print(f"⚠ No title card found at {title_card_path}")
         return
 
+    num_clips = len(videos)
     for idx, video in enumerate(videos):
         try:
+            index = num_clips - idx
+            # centered bold text
+            text_clip = TextClip(
+                text="#" + str(index),
+                font_size=int(output_height * 0.28),  # scales automatically
+                size=(output_width, output_height),
+                color="#4C7EFF",
+                font="Impact",
+                horizontal_align="center",
+                vertical_align="center",
+                duration=transition_duration,
+            )
+
+            # combine layers
+            tmp_clip = CompositeVideoClip([transition_clip, text_clip])
+
+            clips.append(tmp_clip)
+
             clip = VideoFileClip(video["file_path"]).resized(height=output_height)
             clip = transform_clip(clip)
+            clip = normalize_clip_audio(clip)
 
             clips.append(clip)
-            clips.append(transition_clip)
 
         except Exception as e:
             print(f"⚠ Failed to process {video['file_path']}: {e}")
