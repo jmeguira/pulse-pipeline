@@ -3,7 +3,8 @@ import os
 import random
 import re
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, timezone
+from typing import Tuple
 
 import isodate
 import numpy as np
@@ -43,7 +44,26 @@ def clean_title(text: str) -> str:
     return cleaned
 
 
+def keyword_in_title_or_description(
+        keyword: str,
+        title: str,
+        description: str,
+) -> bool:
+    """
+    Returns True if `keyword` or `#keyword` appears as a standalone word
+    in either the title or the description.
+    """
+    keyword = re.escape(keyword.lower())
+    text = f"{title} {description}".lower()
+
+    pattern = rf"(?<!\w)(#?{keyword})(?!\w)"
+    return re.search(pattern, text) is not None
+
+
 def transform_clip(clip: VideoFileClip = None) -> VideoFileClip:
+    """
+    Applies minimally runtime-intensive clip transformations
+    """
     speed_factor = 1 + random.uniform(0.025, 0.05)
     tint_factor = 1 + random.uniform(-0.05, 0.1)
     pan_factor = random.uniform(-0.1, 0.1)
@@ -75,15 +95,146 @@ def normalize_clip_audio(clip: VideoFileClip = None, target_peak: float = 0.9) -
     return clip.with_volume_scaled(factor=factor)
 
 
+def get_last_week_date_range(target_date: date = None) -> Tuple[date, date]:
+    if target_date is None:
+        target_date = date.today()
+
+    days_since_sunday = (target_date.weekday() + 1) % 7
+    most_recent_sunday = target_date - timedelta(days=days_since_sunday)
+    previous_monday = most_recent_sunday - timedelta(days=6)
+
+    return previous_monday, most_recent_sunday
+
+
+def get_outro_clip(output_width=1920, output_height=1080, duration=2.0) -> CompositeVideoClip:
+    bg = ColorClip(size=(output_width, output_height), color=(0, 0, 0), duration=duration)
+
+    top_text = TextClip(
+        text="THANKS FOR WATCHING!",
+        font_size=int(output_height * 0.1),
+        size=(output_width, output_height),
+        color="#4C7EFF",
+        font="Impact",
+        vertical_align="top",
+        duration=duration,
+    )
+
+    bottom_text = TextClip(
+        text="SUBSCRIBE FOR MORE",
+        font_size=int(output_height * 0.1),
+        size=(output_width, output_height),
+        color="#4C7EFF",
+        font="Impact",
+        vertical_align="bottom",
+        duration=duration,
+    )
+
+    return CompositeVideoClip([bg, top_text, bottom_text])
+
+
+# Ordinal helper
+def get_ordinal(n: int) -> str:
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return str(n) + suffix
+
+
+def get_compilation_title(
+        keyword: str, target_count: int, start_date: date, end_date: date, emoji: str = "😺"
+) -> str:
+    """
+    Generate Youtube compilation title.
+
+    Example output:
+    "😺 Top 20 Cat Shorts Weekly Countdown! (Dec 8th–14th, 2025)"
+    """
+    start_day = get_ordinal(start_date.day)
+    end_day = get_ordinal(end_date.day)
+    start_month = start_date.strftime("%b")
+    end_month = end_date.strftime("%b")
+    year = end_date.year
+
+    title = (
+            f"{emoji} Top {target_count} {keyword.capitalize()} Shorts Weekly Countdown!"
+            + f"({start_month} {start_day}–{end_month} {end_day}, {year})"
+    )
+    return title
+
+
+def get_compilation_description(
+        keyword: str,
+        target_count: int,
+        start_date: date,
+        end_date: date,
+        videos: list[dict],
+) -> str:
+    generic_emojis = ["🔥", "⭐", "🎬", "😎", "🎉"]
+    emoji = random.choice(generic_emojis)
+
+    start_day = get_ordinal(start_date.day)
+    end_day = get_ordinal(end_date.day)
+    start_month = start_date.strftime("%b")
+    end_month = end_date.strftime("%b")
+    year = end_date.year
+
+    first_line = (
+            f"{emoji} Weekly roundup: the best {keyword} Shorts from #{target_count}→#1!"
+            + f" ({start_month} {start_day}–{end_month} {end_day}, {year})"
+    )
+    cta_line = f"💬 Comment your favorite clip! #{target_count}→#1"
+    subscribe_line = "👍 Don't forget to like and subscribe for more!\n"
+
+    disclaimer = (
+            "All clips remain property of their original creators. "
+            + "This compilation is edited together for entertainment purposes only. "
+            + "Please support the original channels!\n"
+    )
+
+    # Video list in markdown
+    videos_copy = videos[::-1]  # reversed copy
+    video_lines = [
+        f"{idx + 1}. [{video['title']}](video['url']) - by [{video['uploader']}]"
+        + f"(https://www.youtube.com/channel/{video['snippet']['channelId']})"
+        for idx, video in enumerate(videos_copy)
+    ]
+    video_list_text = "🔹 Videos included:\n" + "\n".join(video_lines)
+
+    hashtags = (
+            f"\n\n#{keyword} #Shorts #YouTubeShorts #Compilation #BestOf"
+            + " #Clips #YouTube #Trending #Viral"
+    )
+
+    description = "\n".join(
+        [first_line, cta_line, subscribe_line, disclaimer, video_list_text, hashtags]
+    )
+
+    return description
+
+
 # -------------------------
 # --- YouTube Fetching ----
 # -------------------------
-def fetch_youtube_shorts(keyword: str, target_count=5, days_back=2, batch_size=50):
+def fetch_youtube_shorts(
+        keyword: str, target_count=5, batch_size=50, published_after=None, published_before=None
+):
     youtube = build("youtube", "v3", developerKey=API_KEY)
-    cutoff_date = (datetime.utcnow() - timedelta(days=days_back)).isoformat("T") + "Z"
     shorts_collected = []
     next_page_token = None
     batch_number = 1
+
+    published_after = datetime.combine(
+        published_after,
+        datetime.min.time(),
+        tzinfo=timezone.utc,
+    ).isoformat()
+
+    published_before = datetime.combine(
+        published_before + timedelta(days=1),
+        datetime.min.time(),
+        tzinfo=timezone.utc,
+    ).isoformat()
 
     print(f"🔍 Fetching Shorts for '{keyword}' (target: {target_count})")
 
@@ -98,7 +249,8 @@ def fetch_youtube_shorts(keyword: str, target_count=5, days_back=2, batch_size=5
                     type="video",
                     part="id",
                     maxResults=batch_size,
-                    publishedAfter=cutoff_date,
+                    publishedAfter=published_after,
+                    publishedBefore=published_before,
                     order="viewCount",
                     pageToken=next_page_token,
                 )
@@ -131,12 +283,12 @@ def fetch_youtube_shorts(keyword: str, target_count=5, days_back=2, batch_size=5
                     video["contentDetails"].get("contentRating", {}).get("ytRating")
                     == "ytAgeRestricted"
             )
-            title_cleaned = clean_title(video["snippet"]["title"])
-            if (
-                    duration_sec <= 60
-                    and not age_restricted
-                    and keyword.lower() in title_cleaned.lower()
-            ):
+
+            title = video["snippet"].get("title", "").lower()
+            description = video["snippet"].get("description", "").lower()
+            keyword_match = keyword_in_title_or_description(keyword, title, description)
+
+            if duration_sec <= 60 and not age_restricted and keyword_match:
                 shorts_collected.append(
                     {
                         "id": video["id"],
@@ -164,6 +316,7 @@ def fetch_youtube_shorts(keyword: str, target_count=5, days_back=2, batch_size=5
 # -------------------------
 def create_compilation(
         keyword,
+        date_range_str=None,
         base_output_path="downloads/",
         title_card_path="title_card.mp4",
         transition_sound_path="pop.wav",
@@ -178,8 +331,10 @@ def create_compilation(
       - Vertical videos: blurred background approximation
       - Random transition sounds with fade-out between clips
     """
-    today_str = datetime.today().strftime("%Y-%m-%d")
-    folder = os.path.join(base_output_path, keyword, today_str)
+    if date_range_str is None:
+        print("⚠ date_range_str must be provided")
+        return
+    folder = os.path.join(base_output_path, keyword, date_range_str)
     metadata_path = os.path.join(folder, "metadata.json")
     output_path = os.path.join(folder, f"{keyword}_compilation.mp4")
     transition_duration = 1
@@ -255,9 +410,7 @@ def create_compilation(
         except Exception as e:
             print(f"⚠ Failed to process {video['file_path']}: {e}")
 
-    if not clips:
-        print(f"⚠ No valid clips for '{keyword}'.")
-        return
+    clips.append(get_outro_clip())
 
     # --- Concatenate all clips ---
     final = concatenate_videoclips(
@@ -279,10 +432,16 @@ def create_compilation(
 # -------------------------
 # --- Main Download & Compile ---
 # -------------------------
-def search_and_download_shorts(
-        keywords, target_count_per_keyword=5, base_output_path="downloads/", days_back=2
+def build_compilation(
+        keywords,
+        target_count=5,
+        published_after=None,
+        published_before=None,
+        base_output_path="downloads/",
 ):
-    today_str = datetime.today().strftime("%Y-%m-%d")
+    date_range_str = (
+            published_after.strftime("%Y-%m-%d") + "_" + published_before.strftime("%Y-%m-%d")
+    )
 
     ydl_opts_base = {
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
@@ -300,7 +459,7 @@ def search_and_download_shorts(
 
     for keyword in keywords:
         print(f"\n🔍 Searching for keyword: '{keyword}'")
-        keyword_folder = os.path.join(base_output_path, keyword, today_str)
+        keyword_folder = os.path.join(base_output_path, keyword, date_range_str)
         os.makedirs(keyword_folder, exist_ok=True)
 
         # --- Check for existing metadata ---
@@ -318,10 +477,11 @@ def search_and_download_shorts(
         existing_videos = [v for v in existing_videos if os.path.exists(v.get("file_path", ""))]
 
         # --- Skip fetching if enough videos exist ---
-        if len(existing_videos) >= target_count_per_keyword:
+        if len(existing_videos) >= target_count:
             print(f"✅ Found {len(existing_videos)} existing videos for '{keyword}'.")
             create_compilation(
                 keyword=keyword,
+                date_range_str=date_range_str,
                 title_card_path="title_card.mp4",
                 base_output_path=base_output_path,
                 transition_sound_path="pop.wav",
@@ -330,7 +490,12 @@ def search_and_download_shorts(
 
         # --- Otherwise fetch new videos ---
         print(f"⬇ Fetching new Shorts for '{keyword}'...")
-        shorts = fetch_youtube_shorts(keyword, target_count_per_keyword, days_back)
+        shorts = fetch_youtube_shorts(
+            keyword=keyword,
+            target_count=target_count,
+            published_after=published_after,
+            published_before=published_before,
+        )
         if not shorts:
             print(f"No Shorts found for '{keyword}'")
             continue
@@ -378,6 +543,7 @@ def search_and_download_shorts(
                 title_card_path = "title_card.mp4"  # adjust path if needed
                 create_compilation(
                     keyword=keyword,
+                    date_range_str=date_range_str,
                     title_card_path=title_card_path,
                     base_output_path=base_output_path,
                     transition_sound_path="pop.wav",
@@ -391,5 +557,6 @@ def search_and_download_shorts(
 # -------------------------
 if __name__ == "__main__":
     keywords = ["cat"]
-    target_count_per_keyword = 2
-    search_and_download_shorts(keywords, target_count_per_keyword)
+    target_count = 3
+    published_after, published_before = get_last_week_date_range()
+    build_compilation(keywords, target_count, published_after, published_before)
