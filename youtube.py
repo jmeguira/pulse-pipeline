@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, date, timezone
 from typing import Tuple
 
 import isodate
-import numpy as np
 import yt_dlp
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
@@ -30,6 +29,20 @@ API_KEY = os.getenv("YOUTUBE_API_KEY")
 if not API_KEY:
     raise RuntimeError("Missing YOUTUBE_API_KEY. Set it in .env or your environment.")
 
+ydl_opts_base = {
+    "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+    "noplaylist": True,
+    "ignoreerrors": True,
+    "cookiefile": "cookies.txt",
+    "retries": 3,
+    "sleep_interval_requests": 0,
+    "max_sleep_interval": 5,
+    "merge_output_format": "mp4",
+    "age_limit": 18,
+    "quiet": True,
+    "no_warnings": True,
+}
+
 
 # -------------------------
 # --- Utilities ----------
@@ -45,9 +58,9 @@ def clean_title(text: str) -> str:
 
 
 def keyword_in_title_or_description(
-        keyword: str,
-        title: str,
-        description: str,
+    keyword: str,
+    title: str,
+    description: str,
 ) -> bool:
     """
     Returns True if `keyword` or `#keyword` appears as a standalone word
@@ -66,33 +79,21 @@ def transform_clip(clip: VideoFileClip = None) -> VideoFileClip:
     """
     speed_factor = 1 + random.uniform(0.025, 0.05)
     tint_factor = 1 + random.uniform(-0.05, 0.1)
-    pan_factor = random.uniform(-0.1, 0.1)
-    left = 1 - pan_factor
-    right = 1 + pan_factor
 
     effects = [vfx.MultiplySpeed(factor=speed_factor), vfx.MultiplyColor(factor=tint_factor)]
 
-    if clip.audio and clip.audio.nchannels == 2:
-        effects.append(afx.MultiplyStereoVolume(left=left, right=right))
+    try:
+        if clip.audio and clip.audio.nchannels == 2:
+            pan_factor = random.uniform(-0.1, 0.1)
+            effects.append(afx.MultiplyStereoVolume(left=1 - pan_factor, right=1 + pan_factor))
+    except Exception:
+        pass
 
     return clip.with_effects(effects)
 
 
-def get_peak(audio: AudioFileClip) -> float:
-    sound = audio.to_soundarray(fps=44100)
-    return np.abs(sound).max()
-
-
 def normalize_clip_audio(clip: VideoFileClip = None, target_peak: float = 0.9) -> VideoFileClip:
-    if clip.audio is None:
-        return clip
-
-    peak = get_peak(clip.audio)
-    if peak == 0:
-        return clip
-
-    factor = target_peak / peak
-    return clip.with_volume_scaled(factor=factor)
+    return clip.with_effects([afx.AudioNormalize()])
 
 
 def get_last_week_date_range(target_date: date = None) -> Tuple[date, date]:
@@ -142,7 +143,7 @@ def get_ordinal(n: int) -> str:
 
 
 def get_compilation_title(
-        keyword: str, target_count: int, start_date: date, end_date: date, emoji: str = "😺"
+    keyword: str, target_count: int, start_date: date, end_date: date, emoji: str = "😺"
 ) -> str:
     """
     Generate Youtube compilation title.
@@ -157,18 +158,18 @@ def get_compilation_title(
     year = end_date.year
 
     title = (
-            f"{emoji} Top {target_count} {keyword.capitalize()} Shorts Weekly Countdown!"
-            + f"({start_month} {start_day}–{end_month} {end_day}, {year})"
+        f"{emoji} Top {target_count} {keyword.capitalize()} Shorts Weekly Countdown!"
+        + f"({start_month} {start_day}–{end_month} {end_day}, {year})"
     )
     return title
 
 
 def get_compilation_description(
-        keyword: str,
-        target_count: int,
-        start_date: date,
-        end_date: date,
-        videos: list[dict],
+    keyword: str,
+    target_count: int,
+    start_date: date,
+    end_date: date,
+    videos: list[dict],
 ) -> str:
     generic_emojis = ["🔥", "⭐", "🎬", "😎", "🎉"]
     emoji = random.choice(generic_emojis)
@@ -180,30 +181,30 @@ def get_compilation_description(
     year = end_date.year
 
     first_line = (
-            f"{emoji} Weekly roundup: the best {keyword} Shorts from #{target_count}→#1!"
-            + f" ({start_month} {start_day}–{end_month} {end_day}, {year})"
+        f"{emoji} Weekly roundup: the best {keyword} Shorts from #{target_count}→#1!"
+        + f" ({start_month} {start_day}–{end_month} {end_day}, {year})"
     )
     cta_line = f"💬 Comment your favorite clip! #{target_count}→#1"
     subscribe_line = "👍 Don't forget to like and subscribe for more!\n"
 
     disclaimer = (
-            "All clips remain property of their original creators. "
-            + "This compilation is edited together for entertainment purposes only. "
-            + "Please support the original channels!\n"
+        "All clips remain property of their original creators. "
+        + "This compilation is edited together for entertainment purposes only. "
+        + "Please support the original channels!\n"
     )
 
     # Video list in markdown
     videos_copy = videos[::-1]  # reversed copy
     video_lines = [
-        f"{idx + 1}. [{video['title']}](video['url']) - by [{video['uploader']}]"
+        f"{idx + 1}. [{video['title']}]({video['url']}) - by [{video['uploader']}]"
         + f"(https://www.youtube.com/channel/{video['snippet']['channelId']})"
         for idx, video in enumerate(videos_copy)
     ]
     video_list_text = "🔹 Videos included:\n" + "\n".join(video_lines)
 
     hashtags = (
-            f"\n\n#{keyword} #Shorts #YouTubeShorts #Compilation #BestOf"
-            + " #Clips #YouTube #Trending #Viral"
+        f"\n\n#{keyword} #Shorts #YouTubeShorts #Compilation #BestOf"
+        + " #Clips #YouTube #Trending #Viral"
     )
 
     description = "\n".join(
@@ -217,7 +218,7 @@ def get_compilation_description(
 # --- YouTube Fetching ----
 # -------------------------
 def fetch_youtube_shorts(
-        keyword: str, target_count=5, batch_size=50, published_after=None, published_before=None
+    keyword: str, target_count=5, batch_size=50, published_after=None, published_before=None
 ):
     youtube = build("youtube", "v3", developerKey=API_KEY)
     shorts_collected = []
@@ -272,7 +273,7 @@ def fetch_youtube_shorts(
                 .execute()
             )
         except Exception as e:
-            print(f"    ❌ Failed to fetch video details: {e}")
+            print(f"    ❌ Failed to fetch video - details: {e}")
             break
 
         for video in videos_resp.get("items", []):
@@ -280,8 +281,8 @@ def fetch_youtube_shorts(
                 isodate.parse_duration(video["contentDetails"]["duration"]).total_seconds()
             )
             age_restricted = (
-                    video["contentDetails"].get("contentRating", {}).get("ytRating")
-                    == "ytAgeRestricted"
+                video["contentDetails"].get("contentRating", {}).get("ytRating")
+                == "ytAgeRestricted"
             )
 
             title = video["snippet"].get("title", "").lower()
@@ -311,17 +312,49 @@ def fetch_youtube_shorts(
     return shorts_collected[:target_count]
 
 
+def download_youtube_shorts(folder: str = None, keyword: str = None, shorts=None):
+    ydl_opts = {**ydl_opts_base, "outtmpl": os.path.join(folder, "%(id)s.%(ext)s")}
+
+    metadata = []
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        for short in tqdm(shorts, desc=f"Downloading {len(shorts)} shorts for '{keyword}'"):
+            try:
+                ydl.download([short["url"]])
+            except Exception as e:
+                print(f"❌ Failed to download {short['url']}: {e}")
+                continue
+
+            metadata_entry = {
+                "title": clean_title(short["title"]),
+                "uploader": short["uploader"],
+                "url": short["url"],
+                "upload_date": short["upload_date"],
+                "view_count": short["view_count"],
+                "duration": short["duration"],
+                "file_path": os.path.join(folder, f"{short['id']}.mp4"),
+            }
+            metadata.append(metadata_entry)
+
+    if metadata:
+        metadata_file = os.path.join(folder, "metadata.json")
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=4)
+
+        print(
+            f"✅ Finished downloading {len(shorts)} shorts for keyword: '{keyword}' \nShorts saved in {folder}"
+        )
+
+
 # -------------------------
 # --- Video Compilation ---
 # -------------------------
 def create_compilation(
-        keyword,
-        date_range_str=None,
-        base_output_path="downloads/",
-        title_card_path="title_card.mp4",
-        transition_sound_path="pop.wav",
-        output_width=1920,
-        output_height=1080,
+    keyword: str = None,
+    folder: str = None,
+    title_card_path: str = "title_card.mp4",
+    transition_sound_path: str = "pop.wav",
+    output_width: int = 1920,
+    output_height: int = 1080,
 ):
     """
     Creates a horizontal (16:9) compilation video:
@@ -331,10 +364,6 @@ def create_compilation(
       - Vertical videos: blurred background approximation
       - Random transition sounds with fade-out between clips
     """
-    if date_range_str is None:
-        print("⚠ date_range_str must be provided")
-        return
-    folder = os.path.join(base_output_path, keyword, date_range_str)
     metadata_path = os.path.join(folder, "metadata.json")
     output_path = os.path.join(folder, f"{keyword}_compilation.mp4")
     transition_duration = 1
@@ -352,8 +381,6 @@ def create_compilation(
 
     # Sort videos by view count ascending
     videos.sort(key=lambda v: v["view_count"])
-    for video in videos:
-        print(f"Video: {video['title']}, view_count: {video['view_count']}")
 
     if os.path.exists(transition_sound_path):
         transition_sound_clip = AudioFileClip(transition_sound_path).subclipped(
@@ -433,123 +460,44 @@ def create_compilation(
 # --- Main Download & Compile ---
 # -------------------------
 def build_compilation(
-        keywords,
-        target_count=5,
-        published_after=None,
-        published_before=None,
-        base_output_path="downloads/",
+    keyword: str = None,
+    target_count: int = 5,
+    published_after: date = None,
+    published_before: date = None,
+    base_output_path: str = "downloads/",
 ):
     date_range_str = (
-            published_after.strftime("%Y-%m-%d") + "_" + published_before.strftime("%Y-%m-%d")
+        published_after.strftime("%Y-%m-%d") + "_" + published_before.strftime("%Y-%m-%d")
     )
 
-    ydl_opts_base = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "noplaylist": True,
-        "ignoreerrors": True,
-        "cookiefile": "cookies.txt",
-        "retries": 3,
-        "sleep_interval_requests": 0,
-        "max_sleep_interval": 5,
-        "merge_output_format": "mp4",
-        "age_limit": 18,
-        "quiet": True,
-        "no_warnings": True,
-    }
+    print(
+        f"\n🔍 Creating compilation video for keyword: '{keyword}' | target_count: '{target_count}'"
+    )
+    folder = os.path.join(base_output_path, keyword, date_range_str)
+    os.makedirs(folder, exist_ok=True)
 
-    for keyword in keywords:
-        print(f"\n🔍 Searching for keyword: '{keyword}'")
-        keyword_folder = os.path.join(base_output_path, keyword, date_range_str)
-        os.makedirs(keyword_folder, exist_ok=True)
+    print(f"⬇ Fetching new Shorts for '{keyword}'...")
+    shorts = fetch_youtube_shorts(
+        keyword=keyword,
+        target_count=target_count,
+        published_after=published_after,
+        published_before=published_before,
+    )
 
-        # --- Check for existing metadata ---
-        existing_videos = []
-        if os.path.exists(os.path.join(keyword_folder, "metadata.json")):
-            try:
-                with open(
-                        os.path.join(keyword_folder, "metadata.json"), "r", encoding="utf-8"
-                ) as f:
-                    existing_videos = json.load(f)
-            except Exception as e:
-                print(f"⚠ Failed to load existing metadata: {e}")
+    if not shorts:
+        print(f"No Shorts found for '{keyword}'")
+        return
 
-        # Filter out any entries whose files are missing
-        existing_videos = [v for v in existing_videos if os.path.exists(v.get("file_path", ""))]
+    download_youtube_shorts(folder=folder, keyword=keyword, shorts=shorts)
 
-        # --- Skip fetching if enough videos exist ---
-        if len(existing_videos) >= target_count:
-            print(f"✅ Found {len(existing_videos)} existing videos for '{keyword}'.")
-            create_compilation(
-                keyword=keyword,
-                date_range_str=date_range_str,
-                title_card_path="title_card.mp4",
-                base_output_path=base_output_path,
-                transition_sound_path="pop.wav",
-            )
-            continue
-
-        # --- Otherwise fetch new videos ---
-        print(f"⬇ Fetching new Shorts for '{keyword}'...")
-        shorts = fetch_youtube_shorts(
+    # --- Create compilation ---
+    try:
+        create_compilation(
             keyword=keyword,
-            target_count=target_count,
-            published_after=published_after,
-            published_before=published_before,
+            folder=folder,
         )
-        if not shorts:
-            print(f"No Shorts found for '{keyword}'")
-            continue
-
-        all_description_lines = []
-        centralized_metadata = []
-        ydl_opts = {**ydl_opts_base, "outtmpl": os.path.join(keyword_folder, "%(id)s.%(ext)s")}
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            for entry in tqdm(shorts, desc=f"Downloading Shorts for '{keyword}'"):
-                try:
-                    ydl.download([entry["url"]])
-                except Exception as e:
-                    print(f"❌ Failed to download {entry['url']}: {e}")
-                    continue
-
-                metadata_entry = {
-                    "title": clean_title(entry["title"]),
-                    "uploader": entry["uploader"],
-                    "url": entry["url"],
-                    "upload_date": entry["upload_date"],
-                    "view_count": entry["view_count"],
-                    "duration": entry["duration"],
-                    "keywords": keyword,
-                    "file_path": os.path.join(keyword_folder, f"{entry['id']}.mp4"),
-                }
-                centralized_metadata.append(metadata_entry)
-                all_description_lines.append(
-                    f"{metadata_entry['title']} - by {metadata_entry['uploader']}"
-                    f" ({metadata_entry['url']})"
-                )
-
-        if centralized_metadata:
-            desc_file = os.path.join(keyword_folder, "description.txt")
-            metadata_file = os.path.join(keyword_folder, "metadata.json")
-            with open(desc_file, "w", encoding="utf-8") as f:
-                f.write("\n".join(all_description_lines))
-            with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(centralized_metadata, f, indent=4)
-
-            print(f"✅ Finished '{keyword}' — {len(shorts)} Shorts saved in {keyword_folder}")
-
-            # --- Create compilation ---
-            try:
-                title_card_path = "title_card.mp4"  # adjust path if needed
-                create_compilation(
-                    keyword=keyword,
-                    date_range_str=date_range_str,
-                    title_card_path=title_card_path,
-                    base_output_path=base_output_path,
-                    transition_sound_path="pop.wav",
-                )
-            except Exception as e:
-                print(f"⚠ Failed to create compilation for '{keyword}': {e}")
+    except Exception as e:
+        print(f"⚠ Failed to create compilation for '{keyword}': {e}")
 
 
 # -------------------------
@@ -559,4 +507,10 @@ if __name__ == "__main__":
     keywords = ["cat"]
     target_count = 3
     published_after, published_before = get_last_week_date_range()
-    build_compilation(keywords, target_count, published_after, published_before)
+    for keyword in keywords:
+        build_compilation(
+            keyword=keyword,
+            target_count=target_count,
+            published_after=published_after,
+            published_before=published_before,
+        )
