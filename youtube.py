@@ -26,8 +26,8 @@ from tqdm import tqdm
 """Load environment variables"""
 load_dotenv()
 API_KEY = os.getenv("YOUTUBE_API_KEY")
-ENABLE_LUFS = os.getenv("ENABLE_LUFS")
-TARGET_LUFS = os.getenv("TARGET_LUFS")
+ENABLE_LUFS = bool(os.getenv("ENABLE_LUFS", True))
+TARGET_LUFS = float(os.getenv("TARGET_LUFS", -14.0))
 
 if not API_KEY:
     raise RuntimeError("Missing YOUTUBE_API_KEY. Set it in .env or your environment.")
@@ -178,7 +178,7 @@ def get_compilation_title(
 
     title = (
         f"{emoji} Top {target_count} {keyword.capitalize()} Shorts Weekly Countdown!"
-        + f"({start_month} {start_day}–{end_month} {end_day}, {year})"
+        + f" ({start_month} {start_day}–{end_month} {end_day}, {year})"
     )
     return title
 
@@ -214,10 +214,7 @@ def get_compilation_description(
 
     # Video list in markdown
     videos_copy = videos[::-1]  # reversed copy
-    video_lines = [
-        f"{idx + 1}. [{video['title']}]({video['url']}) - by [{video['uploader']}]({video['channel_url']})"
-        for idx, video in enumerate(videos_copy)
-    ]
+    video_lines = [f"{idx + 1}. {video['url']}" for idx, video in enumerate(videos_copy)]
     video_list_text = "🔹 Videos included:\n" + "\n".join(video_lines)
 
     hashtags = (
@@ -313,6 +310,7 @@ def fetch_youtube_shorts(
                         "id": video["id"],
                         "title": video["snippet"]["title"],
                         "uploader": video["snippet"]["channelTitle"],
+                        "channel_id": video["snippet"]["channelId"],
                         "url": f"https://www.youtube.com/watch?v={video['id']}",
                         "upload_date": video["snippet"]["publishedAt"],
                         "view_count": int(video["statistics"].get("viewCount", 0)),
@@ -350,8 +348,8 @@ def download_youtube_shorts(folder: str = None, keyword: str = None, shorts=None
                 "view_count": short["view_count"],
                 "duration": short["duration"],
                 "file_path": os.path.join(folder, f"{short['id']}.mp4"),
-                "channel_id": short.get("snippet", {}).get("channelId"),
-                "channel_url": f"https://www.youtube.com/channel/{short.get('snippet', {}).get('channelId')}",
+                "channel_id": short["channel_id"],
+                "channel_url": f"https://www.youtube.com/channel/{short['channel_id']}",
             }
             metadata.append(metadata_entry)
 
