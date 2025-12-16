@@ -3,6 +3,7 @@ import os
 import random
 import re
 import string
+import subprocess
 from datetime import datetime, timedelta, date, timezone
 from typing import Tuple
 
@@ -25,6 +26,8 @@ from tqdm import tqdm
 """Load environment variables"""
 load_dotenv()
 API_KEY = os.getenv("YOUTUBE_API_KEY")
+ENABLE_LUFS = os.getenv("ENABLE_LUFS")
+TARGET_LUFS = os.getenv("TARGET_LUFS")
 
 if not API_KEY:
     raise RuntimeError("Missing YOUTUBE_API_KEY. Set it in .env or your environment.")
@@ -92,8 +95,25 @@ def transform_clip(clip: VideoFileClip = None) -> VideoFileClip:
     return clip.with_effects(effects)
 
 
-def normalize_clip_audio(clip: VideoFileClip = None, target_peak: float = 0.9) -> VideoFileClip:
-    return clip.with_effects([afx.AudioNormalize()])
+def normalize_clip_audio(path: str = None):
+    tmp = path.replace(".mp4", ".tmp.mp4")
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        path,
+        "-af",
+        f"loudnorm=I={TARGET_LUFS}:TP=-2:LRA=11",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        tmp,
+    ]
+
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    os.replace(tmp, path)
 
 
 def get_last_week_date_range(target_date: date = None) -> Tuple[date, date]:
@@ -107,14 +127,14 @@ def get_last_week_date_range(target_date: date = None) -> Tuple[date, date]:
     return previous_monday, most_recent_sunday
 
 
-def get_outro_clip(output_width=1920, output_height=1080, duration=2.0) -> CompositeVideoClip:
+def get_outro_clip(output_width=1920, output_height=1080, duration=3.0) -> CompositeVideoClip:
     bg = ColorClip(size=(output_width, output_height), color=(0, 0, 0), duration=duration)
 
     top_text = TextClip(
         text="THANKS FOR WATCHING!",
-        font_size=int(output_height * 0.1),
+        font_size=int(output_height * 0.15),
         size=(output_width, output_height),
-        color="#4C7EFF",
+        color="white",
         font="Impact",
         vertical_align="top",
         duration=duration,
@@ -122,11 +142,10 @@ def get_outro_clip(output_width=1920, output_height=1080, duration=2.0) -> Compo
 
     bottom_text = TextClip(
         text="SUBSCRIBE FOR MORE",
-        font_size=int(output_height * 0.1),
+        font_size=int(output_height * 0.15),
         size=(output_width, output_height),
-        color="#4C7EFF",
+        color="white",
         font="Impact",
-        vertical_align="bottom",
         duration=duration,
     )
 
@@ -196,8 +215,7 @@ def get_compilation_description(
     # Video list in markdown
     videos_copy = videos[::-1]  # reversed copy
     video_lines = [
-        f"{idx + 1}. [{video['title']}]({video['url']}) - by [{video['uploader']}]"
-        + f"(https://www.youtube.com/channel/{video['snippet']['channelId']})"
+        f"{idx + 1}. [{video['title']}]({video['url']}) - by [{video['uploader']}]({video['channel_url']})"
         for idx, video in enumerate(videos_copy)
     ]
     video_list_text = "🔹 Videos included:\n" + "\n".join(video_lines)
@@ -332,6 +350,8 @@ def download_youtube_shorts(folder: str = None, keyword: str = None, shorts=None
                 "view_count": short["view_count"],
                 "duration": short["duration"],
                 "file_path": os.path.join(folder, f"{short['id']}.mp4"),
+                "channel_id": short.get("snippet", {}).get("channelId"),
+                "channel_url": f"https://www.youtube.com/channel/{short.get('snippet', {}).get('channelId')}",
             }
             metadata.append(metadata_entry)
 
@@ -396,19 +416,18 @@ def create_compilation(
         return
 
     clips = []
-
     # --- Title Card ---
     if os.path.exists(title_card_path):
+        normalize_clip_audio(title_card_path)
         title_clip = VideoFileClip(title_card_path)
         title_clip = title_clip.with_effects([vfx.Resize((output_width, output_height))])
-        title_clip = normalize_clip_audio(title_clip)
         clips.append(title_clip)
     else:
         print(f"⚠ No title card found at {title_card_path}")
         return
 
     num_clips = len(videos)
-    for idx, video in enumerate(videos):
+    for idx, video in enumerate(tqdm(videos, "Pre-processing clips")):
         try:
             index = num_clips - idx
             # centered bold text
@@ -427,17 +446,21 @@ def create_compilation(
             tmp_clip = CompositeVideoClip([transition_clip, text_clip])
 
             clips.append(tmp_clip)
+            if ENABLE_LUFS:
+                try:
+                    normalize_clip_audio(video["file_path"])
+                except Exception as e:
+                    print(f"⚠ Failed to normalize {video['file_path']}: {e}")
 
             clip = VideoFileClip(video["file_path"]).resized(height=output_height)
             clip = transform_clip(clip)
-            clip = normalize_clip_audio(clip)
 
             clips.append(clip)
 
         except Exception as e:
-            print(f"⚠ Failed to process {video['file_path']}: {e}")
-
+            print(f"⚠ Failed to pre-process {video['file_path']}: {e}")
     clips.append(get_outro_clip())
+    clips.append(title_clip)
 
     # --- Concatenate all clips ---
     final = concatenate_videoclips(
@@ -454,6 +477,31 @@ def create_compilation(
     )
 
     print(f"✅ Compilation created: {output_path}")
+
+    # --- Generate title & description ---
+    title = get_compilation_title(
+        keyword=keyword,
+        target_count=len(videos),
+        start_date=published_after,
+        end_date=published_before,
+    )
+
+    description = get_compilation_description(
+        keyword=keyword,
+        target_count=len(videos),
+        start_date=published_after,
+        end_date=published_before,
+        videos=videos,
+    )
+
+    # Write to files in the same folder as the compilation video
+    with open(os.path.join(folder, "title.txt"), "w", encoding="utf-8") as f:
+        f.write(title)
+
+    with open(os.path.join(folder, "description.txt"), "w", encoding="utf-8") as f:
+        f.write(description)
+
+    print(f"✅ Title & description saved in: {folder}")
 
 
 # -------------------------
@@ -498,13 +546,14 @@ def build_compilation(
         )
     except Exception as e:
         print(f"⚠ Failed to create compilation for '{keyword}': {e}")
+        return
 
 
 # -------------------------
 # --- Run Script ----------
 # -------------------------
 if __name__ == "__main__":
-    keywords = ["cat"]
+    keywords = ["fart"]
     target_count = 3
     published_after, published_before = get_last_week_date_range()
     for keyword in keywords:
