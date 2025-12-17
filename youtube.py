@@ -29,6 +29,11 @@ API_KEY = os.getenv("YOUTUBE_API_KEY")
 ENABLE_LUFS = bool(os.getenv("ENABLE_LUFS", True))
 TARGET_LUFS = float(os.getenv("TARGET_LUFS", -14.0))
 
+KEYWORD_CONFIG = {
+    "cat": ["😺", "🐾", "😻"],
+    "funny": ["😂", "🤣", "😹"],
+}
+
 if not API_KEY:
     raise RuntimeError("Missing YOUTUBE_API_KEY. Set it in .env or your environment.")
 
@@ -341,7 +346,7 @@ def download_youtube_shorts(folder: str = None, keyword: str = None, shorts=None
                 continue
 
             metadata_entry = {
-                "title": clean_title(short["title"]),
+                "title": short["title"],
                 "uploader": short["uploader"],
                 "url": short["url"],
                 "upload_date": short["upload_date"],
@@ -551,8 +556,8 @@ def build_compilation(
 # --- Run Script ----------
 # -------------------------
 if __name__ == "__main__":
-    keywords = ["fart"]
-    target_count = 3
+    keywords = ["funny"]
+    target_count = 25
     published_after, published_before = get_last_week_date_range()
     for keyword in keywords:
         build_compilation(
