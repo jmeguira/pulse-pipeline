@@ -6,6 +6,7 @@ cookies.txt
 *.mp4
 *.wav
 *.mp3
+*.png
 transition_sounds/
 
 # PyCharm

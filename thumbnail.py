@@ -14,7 +14,7 @@ stroke_width_subtitle = 6
 title_text = "Top #25 Funny Shorts!"
 subtitle_text = "From last week: Dec 8th–Dec 14th"
 
-logo_path = "logo.png"
+logo_path = "assets/logo.png"
 logo_size = (150, 150)
 
 # Emoji PNGs
