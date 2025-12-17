@@ -4,6 +4,7 @@ import random
 import re
 import string
 import subprocess
+from dataclasses import dataclass
 from datetime import datetime, timedelta, date, timezone
 from typing import Tuple
 
@@ -23,16 +24,13 @@ from moviepy import (
 )
 from tqdm import tqdm
 
+from keyword_config import KEYWORD_CONFIG, KeywordConfig
+
 """Load environment variables"""
 load_dotenv()
 API_KEY = os.getenv("YOUTUBE_API_KEY")
-ENABLE_LUFS = bool(os.getenv("ENABLE_LUFS", True))
+ENABLE_LUFS = os.getenv("ENABLE_LUFS", "true").lower() == "true"
 TARGET_LUFS = float(os.getenv("TARGET_LUFS", -14.0))
-
-KEYWORD_CONFIG = {
-    "cat": ["😺", "🐾", "😻"],
-    "funny": ["😂", "🤣", "😹"],
-}
 
 if not API_KEY:
     raise RuntimeError("Missing YOUTUBE_API_KEY. Set it in .env or your environment.")
@@ -55,6 +53,17 @@ ydl_opts_base = {
 # -------------------------
 # --- Utilities ----------
 # -------------------------
+@dataclass
+class RunConfig:
+    keyword: str
+    keyword_config: KeywordConfig
+    target_count: int
+    published_after: date
+    published_before: date
+    enable_lufs: bool
+    target_lufs: float
+
+
 def clean_title(text: str) -> str:
     """Remove hashtags, emojis, and most punctuation for plain-text description."""
     cleaned = re.sub(r"#\S+", "", text)
@@ -100,8 +109,9 @@ def transform_clip(clip: VideoFileClip = None) -> VideoFileClip:
     return clip.with_effects(effects)
 
 
-def normalize_clip_audio(path: str = None):
-    tmp = path.replace(".mp4", ".tmp.mp4")
+def normalize_clip_audio(run_config: RunConfig, path: str = None):
+    base, ext = os.path.splitext(path)
+    tmp = base + ".tmp" + ext
 
     cmd = [
         "ffmpeg",
@@ -109,7 +119,7 @@ def normalize_clip_audio(path: str = None):
         "-i",
         path,
         "-af",
-        f"loudnorm=I={TARGET_LUFS}:TP=-2:LRA=11",
+        f"loudnorm=I={run_config.target_lufs}:TP=-2:LRA=11",
         "-c:v",
         "copy",
         "-c:a",
@@ -121,15 +131,81 @@ def normalize_clip_audio(path: str = None):
     os.replace(tmp, path)
 
 
-def get_last_week_date_range(target_date: date = None) -> Tuple[date, date]:
-    if target_date is None:
-        target_date = date.today()
+def get_last_week_date_range() -> Tuple[date, date]:
+    target_date = date.today()
 
     days_since_sunday = (target_date.weekday() + 1) % 7
     most_recent_sunday = target_date - timedelta(days=days_since_sunday)
     previous_monday = most_recent_sunday - timedelta(days=6)
 
     return previous_monday, most_recent_sunday
+
+
+def get_last_month_date_range() -> Tuple[date, date]:
+    target_date = date.today()
+
+    first_of_this_month = target_date.replace(day=1)
+    last_day_prev_month = first_of_this_month - timedelta(days=1)
+    first_day_prev_month = last_day_prev_month.replace(day=1)
+
+    return first_day_prev_month, last_day_prev_month
+
+
+def prompt_keyword_choice(keyword_choices: list[str]) -> str:
+    print("Choose a keyword:")
+    for i, k in enumerate(keyword_choices, 1):
+        print(f"{i}. {k}")
+    while True:
+        try:
+            index = int(input("Enter number: ")) - 1
+            if 0 <= index < len(keyword_choices):
+                return keyword_choices[index]
+        except ValueError:
+            pass
+        print("Invalid choice, try again.")
+
+
+def prompt_target_count(default: int = 3) -> int:
+    try:
+        return int(input(f"Enter target number of clips (default {default}): ") or default)
+    except ValueError:
+        return default
+
+
+def prompt_date_range() -> Tuple[date, date]:
+    print("Select date range option: [1] last week [2] last month [3] custom")
+    option = input("Enter number (default 1): ").strip() or "1"
+    if option == "1":
+        return get_last_week_date_range()
+    elif option == "2":
+        return get_last_month_date_range()
+    elif option == "3":
+        start = date.fromisoformat(input("Start date (YYYY-MM-DD): "))
+        end = date.fromisoformat(input("End date (YYYY-MM-DD): "))
+        return start, end
+    else:
+        print("Invalid option, defaulting to last week")
+        return get_last_week_date_range()
+
+
+def build_run_config(keyword_choices: list[str]) -> RunConfig:
+    keyword = prompt_keyword_choice(keyword_choices)
+    target_count = prompt_target_count()
+    start_date, end_date = prompt_date_range()
+
+    keyword_config = KEYWORD_CONFIG[keyword]
+    if not keyword_config:
+        raise ValueError(f"No keyword config defined for '{keyword}'")
+
+    return RunConfig(
+        keyword=keyword,
+        keyword_config=keyword_config,
+        target_count=target_count,
+        published_after=start_date,
+        published_before=end_date,
+        enable_lufs=ENABLE_LUFS,
+        target_lufs=TARGET_LUFS,
+    )
 
 
 def get_outro_clip(output_width=1920, output_height=1080, duration=3.0) -> CompositeVideoClip:
@@ -167,7 +243,7 @@ def get_ordinal(n: int) -> str:
 
 
 def get_compilation_title(
-    keyword: str, target_count: int, start_date: date, end_date: date, emoji: str = "😺"
+    run_config: RunConfig,
 ) -> str:
     """
     Generate Youtube compilation title.
@@ -175,6 +251,11 @@ def get_compilation_title(
     Example output:
     "😺 Top 20 Cat Shorts Weekly Countdown! (Dec 8th–14th, 2025)"
     """
+    start_date = run_config.published_after
+    end_date = run_config.published_before
+    keyword = run_config.keyword
+    target_count = run_config.target_count
+
     start_day = get_ordinal(start_date.day)
     end_day = get_ordinal(end_date.day)
     start_month = start_date.strftime("%b")
@@ -182,19 +263,21 @@ def get_compilation_title(
     year = end_date.year
 
     title = (
-        f"{emoji} Top {target_count} {keyword.capitalize()} Shorts Weekly Countdown!"
+        f"{random.choice(run_config.keyword_config.title_emojis)} Top {target_count} {keyword.capitalize()} Shorts Weekly Countdown!"
         + f" ({start_month} {start_day}–{end_month} {end_day}, {year})"
     )
     return title
 
 
 def get_compilation_description(
-    keyword: str,
-    target_count: int,
-    start_date: date,
-    end_date: date,
+    run_config: RunConfig,
     videos: list[dict],
 ) -> str:
+    start_date = run_config.published_after
+    end_date = run_config.published_before
+    keyword = run_config.keyword
+    target_count = run_config.target_count
+
     generic_emojis = ["🔥", "⭐", "🎬", "😎", "🎉"]
     emoji = random.choice(generic_emojis)
 
@@ -237,9 +320,11 @@ def get_compilation_description(
 # -------------------------
 # --- YouTube Fetching ----
 # -------------------------
-def fetch_youtube_shorts(
-    keyword: str, target_count=5, batch_size=50, published_after=None, published_before=None
-):
+def fetch_youtube_shorts(run_config: RunConfig, batch_size=50):
+    keyword = run_config.keyword
+    target_count = run_config.target_count
+    published_after = run_config.published_after
+    published_before = run_config.published_before
     youtube = build("youtube", "v3", developerKey=API_KEY)
     shorts_collected = []
     next_page_token = None
@@ -333,7 +418,8 @@ def fetch_youtube_shorts(
     return shorts_collected[:target_count]
 
 
-def download_youtube_shorts(folder: str = None, keyword: str = None, shorts=None):
+def download_youtube_shorts(run_config: RunConfig, folder: str = None, shorts=None):
+    keyword = run_config.keyword
     ydl_opts = {**ydl_opts_base, "outtmpl": os.path.join(folder, "%(id)s.%(ext)s")}
 
     metadata = []
@@ -372,7 +458,7 @@ def download_youtube_shorts(folder: str = None, keyword: str = None, shorts=None
 # --- Video Compilation ---
 # -------------------------
 def create_compilation(
-    keyword: str = None,
+    run_config: RunConfig,
     folder: str = None,
     title_card_path: str = "title_card.mp4",
     transition_sound_path: str = "pop.wav",
@@ -387,6 +473,7 @@ def create_compilation(
       - Vertical videos: blurred background approximation
       - Random transition sounds with fade-out between clips
     """
+    keyword = run_config.keyword
     metadata_path = os.path.join(folder, "metadata.json")
     output_path = os.path.join(folder, f"{keyword}_compilation.mp4")
     transition_duration = 1
@@ -421,7 +508,6 @@ def create_compilation(
     clips = []
     # --- Title Card ---
     if os.path.exists(title_card_path):
-        normalize_clip_audio(title_card_path)
         title_clip = VideoFileClip(title_card_path)
         title_clip = title_clip.with_effects([vfx.Resize((output_width, output_height))])
         clips.append(title_clip)
@@ -449,9 +535,9 @@ def create_compilation(
             tmp_clip = CompositeVideoClip([transition_clip, text_clip])
 
             clips.append(tmp_clip)
-            if ENABLE_LUFS:
+            if run_config.enable_lufs:
                 try:
-                    normalize_clip_audio(video["file_path"])
+                    normalize_clip_audio(run_config, video["file_path"])
                 except Exception as e:
                     print(f"⚠ Failed to normalize {video['file_path']}: {e}")
 
@@ -463,6 +549,9 @@ def create_compilation(
         except Exception as e:
             print(f"⚠ Failed to pre-process {video['file_path']}: {e}")
     clips.append(get_outro_clip())
+
+    title_clip = VideoFileClip(title_card_path)
+    title_clip = title_clip.with_effects([vfx.Resize((output_width, output_height))])
     clips.append(title_clip)
 
     # --- Concatenate all clips ---
@@ -483,17 +572,11 @@ def create_compilation(
 
     # --- Generate title & description ---
     title = get_compilation_title(
-        keyword=keyword,
-        target_count=len(videos),
-        start_date=published_after,
-        end_date=published_before,
+        run_config=run_config,
     )
 
     description = get_compilation_description(
-        keyword=keyword,
-        target_count=len(videos),
-        start_date=published_after,
-        end_date=published_before,
+        run_config=run_config,
         videos=videos,
     )
 
@@ -511,12 +594,13 @@ def create_compilation(
 # --- Main Download & Compile ---
 # -------------------------
 def build_compilation(
-    keyword: str = None,
-    target_count: int = 5,
-    published_after: date = None,
-    published_before: date = None,
+    run_config: RunConfig,
     base_output_path: str = "downloads/",
 ):
+    keyword = run_config.keyword
+    target_count = run_config.target_count
+    published_after = run_config.published_after
+    published_before = run_config.published_before
     date_range_str = (
         published_after.strftime("%Y-%m-%d") + "_" + published_before.strftime("%Y-%m-%d")
     )
@@ -528,23 +612,18 @@ def build_compilation(
     os.makedirs(folder, exist_ok=True)
 
     print(f"⬇ Fetching new Shorts for '{keyword}'...")
-    shorts = fetch_youtube_shorts(
-        keyword=keyword,
-        target_count=target_count,
-        published_after=published_after,
-        published_before=published_before,
-    )
+    shorts = fetch_youtube_shorts(run_config)
 
     if not shorts:
         print(f"No Shorts found for '{keyword}'")
         return
 
-    download_youtube_shorts(folder=folder, keyword=keyword, shorts=shorts)
+    download_youtube_shorts(run_config=run_config, folder=folder, shorts=shorts)
 
     # --- Create compilation ---
     try:
         create_compilation(
-            keyword=keyword,
+            run_config=run_config,
             folder=folder,
         )
     except Exception as e:
@@ -556,13 +635,5 @@ def build_compilation(
 # --- Run Script ----------
 # -------------------------
 if __name__ == "__main__":
-    keywords = ["funny"]
-    target_count = 25
-    published_after, published_before = get_last_week_date_range()
-    for keyword in keywords:
-        build_compilation(
-            keyword=keyword,
-            target_count=target_count,
-            published_after=published_after,
-            published_before=published_before,
-        )
+    run_config = build_run_config(list(KEYWORD_CONFIG.keys()))
+    build_compilation(run_config)
