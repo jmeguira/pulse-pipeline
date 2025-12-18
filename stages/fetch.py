@@ -1,11 +1,10 @@
-import os
 from datetime import datetime, timezone, timedelta
 
 import isodate
 from googleapiclient.discovery import build
 
-from types.clip import ClipState
-from types.stage import Stage
+from domain.clip import ClipState, Clip, ClipMetadata, ClipSource
+from domain.stage import Stage
 from utils.utils import keyword_in_title_or_description
 
 
@@ -43,6 +42,7 @@ class FetchStage(Stage):
 
         print(f"🔍 Fetching Shorts for '{keyword}' (target: {target_count})")
 
+        eligible_clips = []
         while len(clips_collected) < target_count:
             print(f"  ➤ Batch #{batch_number}, already collected: {len(clips_collected)}")
 
@@ -94,21 +94,24 @@ class FetchStage(Stage):
                 keyword_match = keyword_in_title_or_description(keyword, title, description)
 
                 if duration_sec <= 60 and not age_restricted and keyword_match:
-                    clips_collected.append(
-                        {
-                            "id": video["id"],
-                            "title": video["snippet"]["title"],
-                            "uploader": video["snippet"]["channelTitle"],
-                            "channel_id": video["snippet"]["channelId"],
-                            "url": f"https://www.youtube.com/watch?v={video['id']}",
-                            "upload_date": video["snippet"]["publishedAt"],
-                            "view_count": int(video["statistics"].get("viewCount", 0)),
-                            "duration": duration_sec,
-                            "file_path": os.path.join(
-                                self.context.run_config.OUTPUT_FULL_PATH, f"{video['id']}.mp4"
-                            ),
-                        }
+                    pass
+
+                eligible_clips.append(
+                    Clip(
+                        source=ClipSource.YOUTUBE,
+                        state=ClipState.ELIGIBLE,
+                        metadata=ClipMetadata(
+                            id=video["id"],
+                            title=video["snippet"]["title"],
+                            uploader=video["snippet"]["channelTitle"],
+                            channel_id=video["snippet"]["channelId"],
+                            url=f"https://www.youtube.com/watch?v={video['id']}",
+                            upload_date=video["snippet"]["publishedAt"],
+                            view_count=int(video["statistics"].get("viewCount", 0)),
+                            duration=duration_sec,
+                        ),
                     )
+                )
 
             next_page_token = search_resp.get("nextPageToken")
             if not next_page_token:
@@ -116,5 +119,4 @@ class FetchStage(Stage):
 
             batch_number += 1
 
-        clips_collected.sort(key=lambda x: x["view_count"], reverse=True)
-        self.context.videos = clips_collected[:target_count]
+            self.context.clips = eligible_clips

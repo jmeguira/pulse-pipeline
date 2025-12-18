@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from types.clip import ClipState
-from types.pipeline_context import PipelineContext
+from domain.clip import ClipState
+from domain.pipeline_context import PipelineContext
 
 
 class Stage(ABC):

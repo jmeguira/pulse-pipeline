@@ -3,7 +3,8 @@ import random
 import subprocess
 
 from moviepy import VideoFileClip, vfx, afx
-from types.run_config import RunConfig
+
+from domain.run_config import RunConfig
 
 
 def transform_clip(clip: VideoFileClip = None) -> VideoFileClip:

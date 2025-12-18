@@ -1,7 +1,7 @@
 import random
 
-from types.run_config import RunConfig
-
+from domain.clip import Clip
+from domain.run_config import RunConfig
 from utils.utils import get_ordinal
 
 
@@ -34,7 +34,7 @@ def get_compilation_title(
 
 def get_compilation_description(
     run_config: RunConfig,
-    videos: list[dict],
+    clips: list[Clip],
 ) -> str:
     start_date = run_config.published_after
     end_date = run_config.published_before
@@ -64,9 +64,9 @@ def get_compilation_description(
     )
 
     # Video list in markdown
-    videos_copy = videos[::-1]  # reversed copy
-    video_lines = [f"{idx + 1}. {video['url']}" for idx, video in enumerate(videos_copy)]
-    video_list_text = "🔹 Videos included:\n" + "\n".join(video_lines)
+    clips_copy = clips[::-1]  # reversed copy
+    video_lines = [f"{idx + 1}. {clip.metadata.url}" for idx, clip in enumerate(clips_copy)]
+    video_list_text = "🔹 Clips included:\n" + "\n".join(video_lines)
 
     hashtags = (
         f"\n\n#{keyword} #Shorts #YouTubeShorts #Compilation #BestOf"

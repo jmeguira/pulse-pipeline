@@ -1,4 +1,4 @@
-from types.keyword_config import KeywordConfig
+from domain.keyword_config import KeywordConfig
 
 KEYWORD_CONFIG: dict[str, KeywordConfig] = {
     "cat": KeywordConfig(

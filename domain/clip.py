@@ -33,12 +33,14 @@ class Clip:
     def __init__(
         self,
         source: ClipSource,
+        state: ClipState,
         metadata: ClipMetadata,
         raw_path: Optional[Path] = None,
         processed_path: Optional[Path] = None,
     ):
         self.id = str(uuid.uuid4())
         self.source = source
+        self.state = state
         self.metadata = metadata
         self.raw_path = raw_path
         self.processed_path = processed_path
@@ -49,7 +51,7 @@ class Clip:
         if reason:
             self.failure_reason = reason
 
-    def is_ready_for_stage(self, stage_state: ClipState) -> bool:
+    def is_stage_ready(self, stage_state: ClipState) -> bool:
         return self.state == stage_state
 
     def __repr__(self):

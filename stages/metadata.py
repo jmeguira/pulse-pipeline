@@ -1,6 +1,6 @@
 import os
 
-from types.stage import Stage
+from domain.stage import Stage
 from utils.metadata_utils import get_compilation_title, get_compilation_description
 
 
@@ -16,7 +16,7 @@ class MetadataStage(Stage):
     def run(self):
         run_config = self.context.run_config
         output_path = self.context.run_config.OUTPUT_FULL_PATH
-        videos = self.context.videos
+        clips = self.context.clips
 
         # --- Generate title & description ---
         title = get_compilation_title(
@@ -25,7 +25,7 @@ class MetadataStage(Stage):
 
         description = get_compilation_description(
             run_config=run_config,
-            videos=videos,
+            clips=clips,
         )
 
         # Write to files in the same folder as the compilation video

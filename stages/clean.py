@@ -1,4 +1,4 @@
-from types.stage import Stage
+from domain.stage import Stage
 
 
 class CleanStage(Stage):

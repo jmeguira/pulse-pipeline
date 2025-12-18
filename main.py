@@ -3,13 +3,13 @@ import os
 from dotenv import load_dotenv
 
 from config.keyword_config import KEYWORD_CONFIG
+from domain.pipeline_context import PipelineContext
+from domain.run_config import RunConfig
 from stages.compile import CompileStage
 from stages.download import DownloadStage
 from stages.fetch import FetchStage
 from stages.metadata import MetadataStage
 from stages.preprocess import PreprocessStage
-from types.pipeline_context import PipelineContext
-from types.run_config import RunConfig
 from utils.utils import (
     prompt_keyword_choice,
     prompt_date_range,
@@ -56,9 +56,6 @@ ydl_opts_base = {
 OUTPUT_WIDTH = int(os.getenv("OUTPUT_WIDTH", 1920))
 OUTPUT_HEIGHT = int(os.getenv("OUTPUT_HEIGHT", 1080))
 OUTPUT_BASE_PATH = os.getenv("OUTPUT_BASE_PATH", "downloads/")
-OUTPUT_FULL_PATH = os.path.join(
-    OUTPUT_BASE_PATH,
-)
 TARGET_FPS = int(os.getenv("TARGET_FPS", 30))
 TITLE_CARD_PATH = os.getenv("TITLE_CARD_PATH", "title_card.mp4")
 TRANSITION_SOUND_PATH = os.getenv("TRANSITION_SOUND_PATH", "pop.wav")

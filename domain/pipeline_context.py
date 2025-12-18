@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import List
 
-from types.clip import Clip
-from types.run_config import RunConfig
+from domain.clip import Clip
+from domain.run_config import RunConfig
 
 
 @dataclass

@@ -1,11 +1,11 @@
-import json
 import os
+from pathlib import Path
 
 import yt_dlp
 from tqdm import tqdm
 
-from types.clip import ClipState
-from types.stage import Stage
+from domain.clip import ClipState
+from domain.stage import Stage
 from utils.utils import get_date_range_str
 
 
@@ -37,38 +37,20 @@ class DownloadStage(Stage):
             "outtmpl": os.path.join(output_path, "%(id)s.%(ext)s"),
         }
 
-        metadata = []
-
         with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
-            for video in tqdm(
-                self.context.videos,
-                desc=f"Downloading {len(self.context.videos)} videos for '{keyword}'",
+            for clip in tqdm(
+                self.context.clips,
+                desc=f"Downloading {self.context.run_config.target_count} videos for '{keyword}'",
                 unit="video",
             ):
+                if not clip.is_stage_ready(self.INPUT_CLIP_STATE):
+                    continue
                 try:
-                    ydl.download([video["url"]])
+                    ydl.download(clip.metadata.url)
                 except Exception as e:
-                    print(f"❌ Failed to download {video['url']}: {e}")
+                    clip.set_state(ClipState.FAILED)
+                    clip.failure_reason = f"❌ Failed to download {str(clip)}\n\nError: {str(e)}"
                     continue
 
-                metadata_entry = {
-                    "title": video["title"],
-                    "uploader": video["uploader"],
-                    "url": video["url"],
-                    "upload_date": video["upload_date"],
-                    "view_count": video["view_count"],
-                    "duration": video["duration"],
-                    "file_path": os.path.join(output_path, f"{video['id']}.mp4"),
-                    "channel_id": video["channel_id"],
-                    "channel_url": f"https://www.youtube.com/channel/{video['channel_id']}",
-                }
-                metadata.append(metadata_entry)
-
-        if metadata:
-            metadata_file = os.path.join(output_path, "metadata.json")
-            with open(metadata_file, "w", encoding="utf-8") as f:
-                json.dump(metadata, f, indent=4)
-
-            print(
-                f"✅ Finished downloading {len(self.context.videos)} videos for keyword: '{keyword}' \nvideos saved in {output_path}"
-            )
+                clip.set_state(ClipState.DOWNLOADED)
+                clip.raw_path = Path(output_path) / f"{clip.metadata.id}.mp4"

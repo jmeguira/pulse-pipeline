@@ -1,8 +1,11 @@
+import os
+from pathlib import Path
+
 from moviepy import VideoFileClip
 from tqdm import tqdm
 
-from types.clip import ClipState
-from types.stage import Stage
+from domain.clip import ClipState
+from domain.stage import Stage
 from utils.preprocess_utils import normalize_clip_audio, transform_clip
 
 
@@ -19,20 +22,42 @@ class PreprocessStage(Stage):
         return True
 
     def run(self):
-        for idx, video in enumerate(tqdm(self.context.videos, desc="Pre-processing clips")):
+        for idx, clip in enumerate(tqdm(self.context.clips, desc="Pre-processing clips")):
             try:
+                if not clip.is_stage_ready(self.INPUT_CLIP_STATE):
+                    continue
+
+                if clip.processed_path and Path(clip.processed_path).exists():
+                    continue
+
                 if self.context.run_config.enable_lufs:
                     try:
-                        normalize_clip_audio(self.context.run_config, video["file_path"])
+                        normalize_clip_audio(self.context.run_config, clip.raw_path)
                     except Exception as e:
-                        print(f"⚠ Failed to normalize {video['file_path']}: {e}")
+                        print(f"⚠ Failed to normalize {str(clip)}\n\nError: {str(e)}")
 
-                clip = VideoFileClip(video["file_path"]).resized(
+                        continue
+
+                with VideoFileClip(clip.raw_path).resized(
                     height=self.context.run_config.OUTPUT_HEIGHT
-                )
-                clip = transform_clip(clip)
-                self.context.clips.append(clip)
+                ) as processed_clip:
+                    processed_clip = transform_clip(processed_clip)
+                    processed_output_path = os.path.join(
+                        self.context.run_config.OUTPUT_FULL_PATH,
+                        f"{clip.metadata.id}_processed.mp4",
+                    )
+                    processed_clip.write_videofile(
+                        str(processed_output_path),
+                        fps=self.context.run_config.TARGET_FPS,
+                        codec="libx264",
+                        audio_codec="aac",
+                        verbose=False,
+                        logger=None,
+                    )
+                    clip.processed_path = processed_output_path
+                    clip.set_state(ClipState.PROCESSED)
 
             except Exception as e:
-                print(f"⚠ Failed to pre-process {video['file_path']}: {e}")
+                clip.set_state(ClipState.FAILED)
+                clip.failure_reason = f"❌ Failed to pre-process {str(clip)}\n\nError: {str(e)}"
         pass

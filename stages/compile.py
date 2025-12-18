@@ -1,5 +1,5 @@
-import json
 import os
+from pathlib import Path
 
 from moviepy import (
     AudioFileClip,
@@ -12,8 +12,8 @@ from moviepy import (
 )
 from tqdm import tqdm
 
-from types.clip import ClipState
-from types.stage import Stage
+from domain.clip import ClipState
+from domain.stage import Stage
 from utils.compile_utils import get_outro_clip
 
 
@@ -30,7 +30,6 @@ class CompileStage(Stage):
 
     def run(self):
         keyword = self.context.run_config.keyword
-        metadata_path = os.path.join(self.context.run_config.OUTPUT_FULL_PATH, "metadata.json")
         output_path = os.path.join(
             self.context.run_config.OUTPUT_FULL_PATH, f"{keyword}_compilation.mp4"
         )
@@ -41,34 +40,22 @@ class CompileStage(Stage):
         transition_duration = self.context.run_config.TRANSITION_DURATION
         target_fps = self.context.run_config.TARGET_FPS
 
-        if not os.path.exists(metadata_path):
-            print(f"⚠ No metadata.json found for '{keyword}', skipping compilation.")
-            return
-
-        with open(metadata_path, "r", encoding="utf-8") as f:
-            videos = json.load(f)
-
-        if not videos:
-            print(f"⚠ No videos found in metadata for '{keyword}'.")
-            return
-
         # Sort videos by view count ascending
-        videos.sort(key=lambda v: v["view_count"])
+        self.context.clips.sort(key=lambda v: v.metadata.view_count)
 
-        if os.path.exists(transition_sound_path):
-            transition_sound_clip = AudioFileClip(transition_sound_path).subclipped(
-                0, transition_duration
-            )
-
-            transition_clip = ColorClip(
-                size=(output_width, output_height), color=(0, 0, 0), duration=transition_duration
-            )
-            transition_clip = transition_clip.with_audio(transition_sound_clip)
-        else:
-            print(
+        if not Path(transition_sound_path).exists():
+            raise Exception(
                 f"⚠ No transition audio found at  at {self.context.run_config.TRANSITION_SOUND_PATH}"
             )
-            return
+
+        transition_sound_clip = AudioFileClip(transition_sound_path).subclipped(
+            0, transition_duration
+        )
+
+        transition_clip = ColorClip(
+            size=(output_width, output_height), color=(0, 0, 0), duration=transition_duration
+        )
+        transition_clip = transition_clip.with_audio(transition_sound_clip)
 
         output_clips = []
         # --- Title Card ---
@@ -80,8 +67,10 @@ class CompileStage(Stage):
             print(f"⚠ No title card found at {title_card_path}")
             return
 
-        num_clips = len(videos)
+        num_clips = len(self.context.clips)
         for idx, clip in enumerate(tqdm(self.context.clips, "Compiling clips")):
+            if not clip.is_stage_ready(self.INPUT_CLIP_STATE):
+                continue
             try:
                 index = num_clips - idx
                 # centered bold text
@@ -97,26 +86,26 @@ class CompileStage(Stage):
                 )
 
                 # combine layers
-                tmp_clip = CompositeVideoClip([transition_clip, text_clip])
+                transition_clip = CompositeVideoClip([transition_clip, text_clip])
 
-                output_clips.append(tmp_clip)
-                output_clips.append(clip)
+                output_clips.append(transition_clip)
+                content_clip = VideoFileClip(clip.processed_path)
+                output_clips.append(content_clip)
 
             except Exception as e:
-                print(f"⚠ Failed to pre-process {clip['file_path']}: {e}")
+                print(f"⚠ Failed to compile {str(clip)}: error{str(e)}")
 
         output_clips.append(get_outro_clip())
-
         title_clip = VideoFileClip(title_card_path)
         title_clip = title_clip.with_effects([vfx.Resize((output_width, output_height))])
         output_clips.append(title_clip)
 
         # --- Concatenate all clips ---
-        final = concatenate_videoclips(
+        output_video = concatenate_videoclips(
             output_clips,
             method="compose",
         )
-        final.write_videofile(
+        output_video.write_videofile(
             output_path,
             fps=target_fps,
             codec="libx264",
@@ -127,4 +116,4 @@ class CompileStage(Stage):
 
         for clip in output_clips:
             clip.close()
-        final.close()
+        output_video.close()
