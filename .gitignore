@@ -12,3 +12,8 @@ transition_sounds/
 # PyCharm
 .idea/
 *.iml
+
+
+__pycache__/
+*.pyc
+*.pyo

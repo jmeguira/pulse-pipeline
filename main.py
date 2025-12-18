@@ -9,8 +9,13 @@ from stages.context import PipelineContext
 from stages.download import DownloadStage
 from stages.fetch import FetchStage
 from stages.metadata import MetadataStage
-from stages.transform import TransformStage
-from utils.utils import prompt_keyword_choice, prompt_date_range, prompt_target_count
+from stages.preprocess import PreprocessStage
+from utils.utils import (
+    prompt_keyword_choice,
+    prompt_date_range,
+    prompt_target_count,
+    get_date_range_str,
+)
 
 """Load environment variables"""
 load_dotenv()
@@ -48,9 +53,16 @@ ydl_opts_base = {
 }
 
 # --- Compilation / Output ---
+OUTPUT_WIDTH = int(os.getenv("OUTPUT_WIDTH", 1920))
+OUTPUT_HEIGHT = int(os.getenv("OUTPUT_HEIGHT", 1080))
 OUTPUT_BASE_PATH = os.getenv("OUTPUT_BASE_PATH", "downloads/")
+OUTPUT_FULL_PATH = os.path.join(
+    OUTPUT_BASE_PATH,
+)
+TARGET_FPS = int(os.getenv("TARGET_FPS", 30))
 TITLE_CARD_PATH = os.getenv("TITLE_CARD_PATH", "title_card.mp4")
 TRANSITION_SOUND_PATH = os.getenv("TRANSITION_SOUND_PATH", "pop.wav")
+TRANSITION_DURATION = float(os.getenv("TRANSITION_DURATION", 1.0))
 
 # --- Video / Thumbnail Defaults ---
 THUMBNAIL_WIDTH = int(os.getenv("THUMBNAIL_WIDTH", 1280))
@@ -62,6 +74,9 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
     keyword = prompt_keyword_choice(keyword_choices)
     target_count = prompt_target_count()
     start_date, end_date = prompt_date_range()
+    OUTPUT_FULL_PATH = os.path.join(
+        OUTPUT_BASE_PATH, keyword, get_date_range_str(start_date, end_date)
+    )
 
     keyword_config = KEYWORD_CONFIG[keyword]
     if not keyword_config:
@@ -78,9 +93,14 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
         batch_size=50,
         YOUTUBE_API_KEY=YOUTUBE_API_KEY,
         YDL_OPTS=ydl_opts_base,
+        OUTPUT_WIDTH=OUTPUT_WIDTH,
+        OUTPUT_HEIGHT=OUTPUT_HEIGHT,
         OUTPUT_BASE_PATH=OUTPUT_BASE_PATH,
+        OUTPUT_FULL_PATH=OUTPUT_FULL_PATH,
+        TARGET_FPS=TARGET_FPS,
         TITLE_CARD_PATH=TITLE_CARD_PATH,
         TRANSITION_SOUND_PATH=TRANSITION_SOUND_PATH,
+        TRANSITION_DURATION=TRANSITION_DURATION,
         THUMBNAIL_WIDTH=THUMBNAIL_WIDTH,
         THUMBNAIL_HEIGHT=THUMBNAIL_HEIGHT,
         THUMBNAIL_LOGO_PATH=THUMBNAIL_LOGO_PATH,
@@ -91,7 +111,7 @@ def main_pipeline(context: PipelineContext):
     stages = [
         FetchStage(context),
         DownloadStage(context),
-        TransformStage(context),
+        PreprocessStage(context),
         CompileStage(context),
         MetadataStage(context),
     ]

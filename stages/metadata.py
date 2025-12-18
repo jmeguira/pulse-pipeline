@@ -1,3 +1,6 @@
+import os
+
+from utils.metadata_utils import get_compilation_title, get_compilation_description
 from .base import Stage
 
 
@@ -11,5 +14,25 @@ class MetadataStage(Stage):
         return True
 
     def run(self):
-        # logic to create title, description, etc.
-        pass
+        run_config = self.context.run_config
+        output_path = self.context.run_config.OUTPUT_FULL_PATH
+        videos = self.context.videos
+
+        # --- Generate title & description ---
+        title = get_compilation_title(
+            run_config=run_config,
+        )
+
+        description = get_compilation_description(
+            run_config=run_config,
+            videos=videos,
+        )
+
+        # Write to files in the same folder as the compilation video
+        with open(os.path.join(output_path, "title.txt"), "w", encoding="utf-8") as f:
+            f.write(title)
+
+        with open(os.path.join(output_path, "description.txt"), "w", encoding="utf-8") as f:
+            f.write(description)
+
+        print(f"✅ Title & description saved in: {output_path}")
