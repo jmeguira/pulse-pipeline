@@ -3,13 +3,13 @@ import os
 from dotenv import load_dotenv
 
 from config.keyword_config import KEYWORD_CONFIG
-from config.run_config import RunConfig
 from stages.compile import CompileStage
-from stages.context import PipelineContext
 from stages.download import DownloadStage
 from stages.fetch import FetchStage
 from stages.metadata import MetadataStage
 from stages.preprocess import PreprocessStage
+from types.pipeline_context import PipelineContext
+from types.run_config import RunConfig
 from utils.utils import (
     prompt_keyword_choice,
     prompt_date_range,

@@ -12,8 +12,8 @@ from moviepy import (
 )
 from tqdm import tqdm
 
+from types.stage import Stage
 from utils.compile_utils import get_outro_clip
-from .base import Stage
 
 
 class CompileStage(Stage):

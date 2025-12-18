@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from stages.context import PipelineContext
+from types.pipeline_context import PipelineContext
 
 
 class Stage(ABC):

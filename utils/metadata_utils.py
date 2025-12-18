@@ -1,6 +1,7 @@
 import random
 
-from config.run_config import RunConfig
+from types.run_config import RunConfig
+
 from utils.utils import get_ordinal
 
 

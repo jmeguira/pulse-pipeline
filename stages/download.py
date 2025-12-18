@@ -4,8 +4,8 @@ import os
 import yt_dlp
 from tqdm import tqdm
 
+from types.stage import Stage
 from utils.utils import get_date_range_str
-from .base import Stage
 
 
 class DownloadStage(Stage):

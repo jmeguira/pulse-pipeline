@@ -2,8 +2,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any
 
 from moviepy import VideoFileClip
-
-from config.run_config import RunConfig
+from types.run_config import RunConfig
 
 
 @dataclass

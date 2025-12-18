@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date
 
-from .keyword_config import KeywordConfig
+from config.keyword_config import KeywordConfig
 
 
 @dataclass

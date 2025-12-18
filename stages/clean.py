@@ -1,4 +1,4 @@
-from .base import Stage
+from types.stage import Stage
 
 
 class CleanStage(Stage):

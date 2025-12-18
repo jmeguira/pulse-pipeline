@@ -1,8 +1,8 @@
 from moviepy import VideoFileClip
 from tqdm import tqdm
 
+from types.stage import Stage
 from utils.preprocess_utils import normalize_clip_audio, transform_clip
-from .base import Stage
 
 
 class PreprocessStage(Stage):

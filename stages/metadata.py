@@ -1,7 +1,7 @@
 import os
 
+from types.stage import Stage
 from utils.metadata_utils import get_compilation_title, get_compilation_description
-from .base import Stage
 
 
 class MetadataStage(Stage):

@@ -1,10 +1,11 @@
+import os
 from datetime import datetime, timezone, timedelta
 
 import isodate
 from googleapiclient.discovery import build
 
+from types.stage import Stage
 from utils.utils import keyword_in_title_or_description
-from .base import Stage
 
 
 class FetchStage(Stage):
@@ -100,6 +101,9 @@ class FetchStage(Stage):
                             "upload_date": video["snippet"]["publishedAt"],
                             "view_count": int(video["statistics"].get("viewCount", 0)),
                             "duration": duration_sec,
+                            "file_path": os.path.join(
+                                self.context.run_config.OUTPUT_FULL_PATH, f"{video['id']}.mp4"
+                            ),
                         }
                     )
 
