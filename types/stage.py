@@ -1,10 +1,15 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
+from types.clip import ClipState
 from types.pipeline_context import PipelineContext
 
 
 class Stage(ABC):
     """Base class for all stages in the pipeline."""
+
+    INPUT_CLIP_STATE: Optional[ClipState] = None
+    OUTPUT_CLIP_STATE: Optional[ClipState] = None
 
     def __init__(self, context: PipelineContext):
         self.context = context

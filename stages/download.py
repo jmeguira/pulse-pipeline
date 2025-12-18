@@ -4,11 +4,15 @@ import os
 import yt_dlp
 from tqdm import tqdm
 
+from types.clip import ClipState
 from types.stage import Stage
 from utils.utils import get_date_range_str
 
 
 class DownloadStage(Stage):
+    INPUT_CLIP_STATE = ClipState.ELIGIBLE
+    OUTPUT_CLIP_STATE = ClipState.DOWNLOADED
+
     @property
     def name(self):
         return "Download videos"

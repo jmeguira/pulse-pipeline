@@ -1,14 +1,11 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import List
 
-from moviepy import VideoFileClip
+from types.clip import Clip
 from types.run_config import RunConfig
 
 
 @dataclass
 class PipelineContext:
     run_config: RunConfig
-    videos: List[Dict[str, Any]] = field(default_factory=list)
-    clips: List[VideoFileClip] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    filepaths: Dict[str, str] = field(default_factory=dict)
+    clips: List[Clip] = field(default_factory=list)

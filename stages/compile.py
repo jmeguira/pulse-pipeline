@@ -12,11 +12,14 @@ from moviepy import (
 )
 from tqdm import tqdm
 
+from types.clip import ClipState
 from types.stage import Stage
 from utils.compile_utils import get_outro_clip
 
 
 class CompileStage(Stage):
+    INPUT_CLIP_STATE = ClipState.PROCESSED
+
     @property
     def name(self):
         return "Compile Video"

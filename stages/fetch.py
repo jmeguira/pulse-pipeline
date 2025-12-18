@@ -4,11 +4,14 @@ from datetime import datetime, timezone, timedelta
 import isodate
 from googleapiclient.discovery import build
 
+from types.clip import ClipState
 from types.stage import Stage
 from utils.utils import keyword_in_title_or_description
 
 
 class FetchStage(Stage):
+    OUTPUT_CLIP_STATE = ClipState.ELIGIBLE
+
     @property
     def name(self):
         return "Fetch YouTube Shorts"
@@ -23,7 +26,7 @@ class FetchStage(Stage):
         published_after = self.context.run_config.published_after
         published_before = self.context.run_config.published_before
         youtube = build("youtube", "v3", developerKey=self.context.run_config.YOUTUBE_API_KEY)
-        shorts_collected = []
+        clips_collected = []
         next_page_token = None
         batch_number = 1
 
@@ -40,8 +43,8 @@ class FetchStage(Stage):
 
         print(f"🔍 Fetching Shorts for '{keyword}' (target: {target_count})")
 
-        while len(shorts_collected) < target_count:
-            print(f"  ➤ Batch #{batch_number}, already collected: {len(shorts_collected)}")
+        while len(clips_collected) < target_count:
+            print(f"  ➤ Batch #{batch_number}, already collected: {len(clips_collected)}")
 
             try:
                 search_resp = (
@@ -91,7 +94,7 @@ class FetchStage(Stage):
                 keyword_match = keyword_in_title_or_description(keyword, title, description)
 
                 if duration_sec <= 60 and not age_restricted and keyword_match:
-                    shorts_collected.append(
+                    clips_collected.append(
                         {
                             "id": video["id"],
                             "title": video["snippet"]["title"],
@@ -113,5 +116,5 @@ class FetchStage(Stage):
 
             batch_number += 1
 
-        shorts_collected.sort(key=lambda x: x["view_count"], reverse=True)
-        self.context.videos = shorts_collected[:target_count]
+        clips_collected.sort(key=lambda x: x["view_count"], reverse=True)
+        self.context.videos = clips_collected[:target_count]
