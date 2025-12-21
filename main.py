@@ -17,14 +17,16 @@ from utils.utils import (
     get_date_range_str,
 )
 
-"""Load environment variables"""
 load_dotenv()
+
+# --- Fetch/Discover
+MAX_PAGES = int(os.getenv("MAX_PAGES", 100))
+OVERSAMPLE = int(os.getenv("OVERSAMPLE", 10))
+
+# --- Download
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 if not YOUTUBE_API_KEY:
     raise RuntimeError("Missing YOUTUBE_API_KEY. Set it in .env or your environment.")
-
-ENABLE_LUFS = os.getenv("ENABLE_LUFS", "true").lower() == "true"
-TARGET_LUFS = float(os.getenv("TARGET_LUFS", -14.0))
 
 YDL_FORMAT = os.getenv("YDL_FORMAT", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best")
 YDL_NO_PLAYLIST = os.getenv("YDL_NO_PLAYLIST", "true").lower() == "true"
@@ -51,6 +53,10 @@ ydl_opts_base = {
     "quiet": YDL_QUIET,
     "no_warnings": YDL_NO_WARNINGS,
 }
+
+# --- Preprocessing
+ENABLE_LUFS = os.getenv("ENABLE_LUFS", "true").lower() == "true"
+TARGET_LUFS = float(os.getenv("TARGET_LUFS", -14.0))
 
 # --- Compilation / Output ---
 OUTPUT_WIDTH = int(os.getenv("OUTPUT_WIDTH", 1920))
@@ -85,11 +91,13 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
         target_count=target_count,
         published_after=start_date,
         published_before=end_date,
-        enable_lufs=ENABLE_LUFS,
-        target_lufs=TARGET_LUFS,
         batch_size=50,
+        MAX_PAGES=MAX_PAGES,
+        OVERSAMPLE=OVERSAMPLE,
         YOUTUBE_API_KEY=YOUTUBE_API_KEY,
         YDL_OPTS=ydl_opts_base,
+        enable_lufs=ENABLE_LUFS,
+        target_lufs=TARGET_LUFS,
         OUTPUT_WIDTH=OUTPUT_WIDTH,
         OUTPUT_HEIGHT=OUTPUT_HEIGHT,
         OUTPUT_BASE_PATH=OUTPUT_BASE_PATH,

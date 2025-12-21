@@ -25,8 +25,13 @@ class CompileStage(Stage):
         return "Compile Video"
 
     def should_run(self):
-        # e.g., skip if compilation already exists
-        return True
+        if (
+            len([v for v in self.context.clips if v.state == ClipState.ELIGIBLE])
+            > self.context.run_config.target_count
+        ):
+            return True
+        else:
+            return False
 
     def run(self):
         keyword = self.context.run_config.keyword

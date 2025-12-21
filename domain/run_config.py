@@ -14,6 +14,8 @@ class RunConfig:
     enable_lufs: bool
     target_lufs: float
     batch_size: int
+    MAX_PAGES: int
+    OVERSAMPLE: int
     YOUTUBE_API_KEY: str
     YDL_OPTS: dict
     # --- Compilation / Output ---

@@ -22,7 +22,12 @@ class PreprocessStage(Stage):
         return True
 
     def run(self):
-        for idx, clip in enumerate(tqdm(self.context.clips, desc="Pre-processing clips")):
+        for idx, clip in enumerate(
+            tqdm(
+                self.context.clips,
+                desc="Pre-processing clips",
+            )
+        ):
             try:
                 if not clip.is_stage_ready(self.INPUT_CLIP_STATE):
                     continue

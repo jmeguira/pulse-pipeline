@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from domain.clip import ClipState
 from domain.pipeline_context import PipelineContext
@@ -8,11 +7,17 @@ from domain.pipeline_context import PipelineContext
 class Stage(ABC):
     """Base class for all stages in the pipeline."""
 
-    INPUT_CLIP_STATE: Optional[ClipState] = None
-    OUTPUT_CLIP_STATE: Optional[ClipState] = None
+    INPUT_CLIP_STATE: ClipState | None = None
+    OUTPUT_CLIP_STATE: ClipState | None = None
 
     def __init__(self, context: PipelineContext):
         self.context = context
+
+    def clips_in_state(self, state: ClipState):
+        return [c for c in self.context.clips if c.state == state]
+
+    def clips_not_in_state(self, state: ClipState):
+        return [c for c in self.context.clips if c.state != state]
 
     @property
     @abstractmethod

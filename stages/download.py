@@ -6,7 +6,6 @@ from tqdm import tqdm
 
 from domain.clip import ClipState
 from domain.stage import Stage
-from utils.utils import get_date_range_str
 
 
 class DownloadStage(Stage):
@@ -18,19 +17,11 @@ class DownloadStage(Stage):
         return "Download videos"
 
     def should_run(self):
-        # e.g., skip if all files already exist
         return True
 
     def run(self):
         keyword = self.context.run_config.keyword
-        output_path = os.path.join(
-            self.context.run_config.OUTPUT_BASE_PATH,
-            self.context.run_config.keyword,
-            get_date_range_str(
-                self.context.run_config.published_after,
-                self.context.run_config.published_before,
-            ),
-        )
+        output_path = self.context.run_config.OUTPUT_FULL_PATH
         os.makedirs(output_path, exist_ok=True)
         YDL_OPTS = {
             **self.context.run_config.YDL_OPTS,
@@ -39,7 +30,7 @@ class DownloadStage(Stage):
 
         with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
             for clip in tqdm(
-                self.context.clips,
+                [v for v in self.context.clips if v.state == ClipState.ELIGIBLE],
                 desc=f"Downloading {self.context.run_config.target_count} videos for '{keyword}'",
                 unit="video",
             ):
