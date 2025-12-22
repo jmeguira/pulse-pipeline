@@ -6,9 +6,9 @@ from config.keyword_config import KEYWORD_CONFIG
 from domain.pipeline_context import PipelineContext
 from domain.run_config import RunConfig
 from stages.compile import CompileStage
+from stages.discover import DiscoverStage
 from stages.download import DownloadStage
-from stages.fetch import FetchStage
-from stages.metadata import MetadataStage
+from stages.persist import MetadataStage
 from stages.preprocess import PreprocessStage
 from utils.utils import (
     prompt_keyword_choice,
@@ -114,7 +114,7 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
 
 def main_pipeline(context: PipelineContext):
     stages = [
-        FetchStage(context),
+        DiscoverStage(context),
         DownloadStage(context),
         PreprocessStage(context),
         CompileStage(context),

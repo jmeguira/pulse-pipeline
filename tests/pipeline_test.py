@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 from domain.pipeline_context import PipelineContext
 from domain.run_config import RunConfig
 from stages.compile import CompileStage
+from stages.discover import DiscoverStage
 from stages.download import DownloadStage
-from stages.fetch import FetchStage
-from stages.metadata import MetadataStage
+from stages.persist import MetadataStage
 from stages.preprocess import PreprocessStage
 
 
@@ -42,7 +42,7 @@ def test_pipeline_runs_all_stages():
     context = PipelineContext(run_config=run_config)
 
     stages = [
-        FetchStage(context),
+        DiscoverStage(context),
         DownloadStage(context),
         PreprocessStage(context),
         CompileStage(context),

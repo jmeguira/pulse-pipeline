@@ -4,7 +4,7 @@ from domain.stage import Stage
 from utils.metadata_utils import get_compilation_title, get_compilation_description
 
 
-class MetadataStage(Stage):
+class PersistStage(Stage):
     @property
     def name(self):
         return "Generate Metadata"

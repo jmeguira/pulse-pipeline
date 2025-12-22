@@ -11,6 +11,29 @@ class ClipSource(str, Enum):
 
 
 class ClipState(str, Enum):
+    """
+    Lifecycle state for a Clip within a single pipeline run.
+
+    States are used to define stage contracts. A stage should operate on a specific
+    state (or set of states) and advance clips forward.
+
+    Typical progression (conceptual):
+    - DISCOVERED  -> hydrated candidate metadata exists
+    - ELIGIBLE    -> passed hard gates (shape/constraints); still not "selected"
+    - SELECTED    -> chosen for downstream execution (exactly target_count)
+    - DOWNLOADED  -> raw media file exists locally
+    - PROCESSED   -> processed media artifact exists (normalized, trimmed, etc.)
+    - COMPILED    -> incorporated into final compilation output
+
+    Terminal / exceptional states:
+    - REJECTED    -> failed a hard gate (reason should be recorded)
+    - FAILED      -> stage execution error (reason + stage should be recorded)
+
+    Notes:
+    - Eligibility is a *hard gate*; scoring/ranking should not reject clips.
+    - Avoid implicit meaning: "eligible" is not the same as "selected."
+    """
+
     ELIGIBLE = "eligible"
     DOWNLOADED = "downloaded"
     PROCESSED = "processed"
@@ -19,6 +42,18 @@ class ClipState(str, Enum):
 
 @dataclass
 class ClipMetadata:
+    """
+    Metadata attached to a Clip.
+
+    Contains identifiers and descriptive fields required for:
+    - eligibility checks (duration, age restriction, topic match, etc.)
+    - scoring/ranking (views, freshness, engagement signals, etc.)
+    - downstream output (titles, attribution, URLs)
+
+    The project prefers metadata-first reasoning: persist and operate on metadata
+    before committing to heavyweight file operations.
+    """
+
     id: str
     title: str
     uploader: str
@@ -30,6 +65,26 @@ class ClipMetadata:
 
 
 class Clip:
+    """
+    Run-scoped domain object representing one candidate unit of content.
+
+    A Clip is the central object in the pipeline. It carries:
+    - `source`: where the clip came from (e.g., YouTube)
+    - `state`: lifecycle position in the pipeline (ClipState)
+    - `metadata`: immutable-ish descriptive fields used for eligibility/scoring/output
+    - optional artifact paths produced by stages (downloaded file, processed file, etc.)
+
+    Design intent:
+    - Clips start as lightweight metadata and only become "heavy" (files on disk)
+      after selection/execution stages.
+    - ClipState defines which stages may operate on a clip.
+    - Failures should be explicit via FAILED/REJECTED with recorded reasons.
+
+    Recommended invariants:
+    - Stages should only advance state once the output artifact exists.
+    - Stages should not silently mutate unrelated fields; prefer explicit transitions.
+    """
+
     def __init__(
         self,
         source: ClipSource,

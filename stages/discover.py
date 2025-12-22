@@ -8,12 +8,12 @@ from domain.stage import Stage
 from utils.utils import keyword_in_title_or_description
 
 
-class FetchStage(Stage):
+class DiscoverStage(Stage):
     OUTPUT_CLIP_STATE = ClipState.ELIGIBLE
 
     @property
     def name(self):
-        return "Fetch YouTube Shorts"
+        return "Discover YouTube Shorts"
 
     def candidate_goal(self) -> int:
         return self.context.run_config.target_count * self.context.run_config.OVERSAMPLE
