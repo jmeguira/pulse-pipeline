@@ -1,5 +1,6 @@
 import os
 
+from domain.pipeline_context import PipelineContext
 from domain.stage import Stage
 from utils.metadata_utils import get_compilation_title, get_compilation_description
 
@@ -7,16 +8,16 @@ from utils.metadata_utils import get_compilation_title, get_compilation_descript
 class PersistStage(Stage):
     @property
     def name(self):
-        return "Generate Metadata"
+        return "Persist Stage"
 
-    def should_run(self):
+    def should_run(self, ctx: PipelineContext) -> bool:
         # e.g., skip if title/description already exist
         return True
 
-    def run(self):
-        run_config = self.context.run_config
-        output_path = self.context.run_config.OUTPUT_FULL_PATH
-        clips = self.context.clips
+    def run(self, ctx: PipelineContext) -> None:
+        run_config = ctx.run_config
+        output_path = ctx.run_config.OUTPUT_FULL_PATH
+        clips = ctx.clip_ctx.clips
 
         # --- Generate title & description ---
         title = get_compilation_title(

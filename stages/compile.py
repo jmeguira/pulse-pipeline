@@ -13,6 +13,7 @@ from moviepy import (
 from tqdm import tqdm
 
 from domain.clip import ClipState
+from domain.pipeline_context import PipelineContext
 from domain.stage import Stage
 from utils.compile_utils import get_outro_clip
 
@@ -24,33 +25,33 @@ class CompileStage(Stage):
     def name(self):
         return "Compile Video"
 
-    def should_run(self):
+    def should_run(self, ctx: PipelineContext) -> bool:
         if (
-            len([v for v in self.context.clips if v.state == ClipState.ELIGIBLE])
-            > self.context.run_config.target_count
+            ctx.clip_ctx.clips_in_state(ClipState.ELIGIBLE)
+            > ctx.run_config.TARGET_COUNT
         ):
             return True
         else:
             return False
 
-    def run(self):
-        keyword = self.context.run_config.keyword
+    def run(self, ctx: PipelineContext) -> None:
+        keyword = ctx.run_config.KEYWORD
         output_path = os.path.join(
-            self.context.run_config.OUTPUT_FULL_PATH, f"{keyword}_compilation.mp4"
+            ctx.run_config.OUTPUT_FULL_PATH, f"{keyword}_compilation.mp4"
         )
-        transition_sound_path = self.context.run_config.TRANSITION_SOUND_PATH
-        title_card_path = self.context.run_config.TITLE_CARD_PATH
-        output_width = self.context.run_config.OUTPUT_WIDTH
-        output_height = self.context.run_config.OUTPUT_HEIGHT
-        transition_duration = self.context.run_config.TRANSITION_DURATION
-        target_fps = self.context.run_config.TARGET_FPS
+        transition_sound_path = ctx.run_config.TRANSITION_SOUND_PATH
+        title_card_path = ctx.run_config.TITLE_CARD_PATH
+        output_width = ctx.run_config.OUTPUT_WIDTH
+        output_height = ctx.run_config.OUTPUT_HEIGHT
+        transition_duration = ctx.run_config.TRANSITION_DURATION
+        target_fps = ctx.run_config.TARGET_FPS
 
         # Sort videos by view count ascending
-        self.context.clips.sort(key=lambda v: v.metadata.view_count)
+        ctx.clip_ctx.clips.sort(key=lambda v: v.metadata.view_count)
 
         if not Path(transition_sound_path).exists():
             raise Exception(
-                f"⚠ No transition audio found at  at {self.context.run_config.TRANSITION_SOUND_PATH}"
+                f"⚠ No transition audio found at  at {ctx.run_config.TRANSITION_SOUND_PATH}"
             )
 
         transition_sound_clip = AudioFileClip(transition_sound_path).subclipped(
@@ -72,8 +73,8 @@ class CompileStage(Stage):
             print(f"⚠ No title card found at {title_card_path}")
             return
 
-        num_clips = len(self.context.clips)
-        for idx, clip in enumerate(tqdm(self.context.clips, "Compiling clips")):
+        num_clips = len(ctx.clip_ctx.clips)
+        for idx, clip in enumerate(tqdm(ctx.clip_ctx.clips, "Compiling clips")):
             if not clip.is_stage_ready(self.INPUT_CLIP_STATE):
                 continue
             try:

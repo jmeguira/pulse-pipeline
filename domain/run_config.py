@@ -6,16 +6,17 @@ from config.keyword_config import KeywordConfig
 
 @dataclass
 class RunConfig:
-    keyword: str
-    keyword_config: KeywordConfig
-    target_count: int
-    published_after: date
-    published_before: date
-    enable_lufs: bool
-    target_lufs: float
-    batch_size: int
+    KEYWORD: str
+    KEYWORD_CONFIG: KeywordConfig
+    TARGET_COUNT: int
+    PUBLISHED_AFTER: date
+    PUBLISHED_BEFORE: date
+    ENABLE_LUFS: bool
+    TARGET_LUFS: float
+    BATCH_SIZE: int
     MAX_PAGES: int
     OVERSAMPLE: int
+    CANDIDATE_GOAL: int
     YOUTUBE_API_KEY: str
     YDL_OPTS: dict
     # --- Compilation / Output ---

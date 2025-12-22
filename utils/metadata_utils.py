@@ -14,10 +14,10 @@ def get_compilation_title(
     Example output:
     "😺 Top 20 Cat Shorts Weekly Countdown! (Dec 8th–14th, 2025)"
     """
-    start_date = run_config.published_after
-    end_date = run_config.published_before
-    keyword = run_config.keyword
-    target_count = run_config.target_count
+    start_date = run_config.PUBLISHED_AFTER
+    end_date = run_config.PUBLISHED_BEFORE
+    keyword = run_config.KEYWORD
+    target_count = run_config.TARGET_COUNT
 
     start_day = get_ordinal(start_date.day)
     end_day = get_ordinal(end_date.day)
@@ -26,7 +26,7 @@ def get_compilation_title(
     year = end_date.year
 
     title = (
-        f"{random.choice(run_config.keyword_config.title_emojis)} Top {target_count} {keyword.capitalize()} Shorts Weekly Countdown!"
+        f"{random.choice(run_config.KEYWORD_CONFIG.title_emojis)} Top {target_count} {keyword.capitalize()} Shorts Weekly Countdown!"
         + f" ({start_month} {start_day}–{end_month} {end_day}, {year})"
     )
     return title
@@ -36,10 +36,10 @@ def get_compilation_description(
     run_config: RunConfig,
     clips: list[Clip],
 ) -> str:
-    start_date = run_config.published_after
-    end_date = run_config.published_before
-    keyword = run_config.keyword
-    target_count = run_config.target_count
+    start_date = run_config.PUBLISHED_AFTER
+    end_date = run_config.PUBLISHED_BEFORE
+    keyword = run_config.KEYWORD
+    target_count = run_config.TARGET_COUNT
 
     generic_emojis = ["🔥", "⭐", "🎬", "😎", "🎉"]
     emoji = random.choice(generic_emojis)

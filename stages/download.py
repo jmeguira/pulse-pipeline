@@ -5,6 +5,7 @@ import yt_dlp
 from tqdm import tqdm
 
 from domain.clip import ClipState
+from domain.pipeline_context import PipelineContext
 from domain.stage import Stage
 
 
@@ -16,22 +17,22 @@ class DownloadStage(Stage):
     def name(self):
         return "Download videos"
 
-    def should_run(self):
+    def should_run(self, ctx: PipelineContext) -> bool:
         return True
 
-    def run(self):
-        keyword = self.context.run_config.keyword
-        output_path = self.context.run_config.OUTPUT_FULL_PATH
+    def run(self, ctx: PipelineContext):
+        keyword = ctx.run_config.KEYWORD
+        output_path = ctx.run_config.OUTPUT_FULL_PATH
         os.makedirs(output_path, exist_ok=True)
         YDL_OPTS = {
-            **self.context.run_config.YDL_OPTS,
+            **ctx.run_config.YDL_OPTS,
             "outtmpl": os.path.join(output_path, "%(id)s.%(ext)s"),
         }
 
         with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
             for clip in tqdm(
-                [v for v in self.context.clips if v.state == ClipState.ELIGIBLE],
-                desc=f"Downloading {self.context.run_config.target_count} videos for '{keyword}'",
+                ctx.clip_ctx.clips_in_state(ClipState.ELIGIBLE),
+                desc=f"Downloading {ctx.run_config.TARGET_COUNT} videos for '{keyword}'",
                 unit="video",
             ):
                 if not clip.is_stage_ready(self.INPUT_CLIP_STATE):

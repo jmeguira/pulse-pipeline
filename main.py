@@ -3,13 +3,18 @@ import os
 from dotenv import load_dotenv
 
 from config.keyword_config import KEYWORD_CONFIG
+from domain.clip import ClipState
 from domain.pipeline_context import PipelineContext
 from domain.run_config import RunConfig
 from stages.compile import CompileStage
+from stages.cull import CullStage
 from stages.discover import DiscoverStage
 from stages.download import DownloadStage
-from stages.persist import MetadataStage
-from stages.preprocess import PreprocessStage
+from stages.filter import FilterStage
+from stages.persist import PersistStage
+from stages.score import ScoreStage
+from stages.select import SelectStage
+from stages.transform import TransformStage
 from utils.utils import (
     prompt_keyword_choice,
     prompt_date_range,
@@ -40,7 +45,7 @@ YDL_AGE_LIMIT = int(os.getenv("YDL_AGE_LIMIT", 18))
 YDL_QUIET = os.getenv("YDL_QUIET", "true").lower() == "true"
 YDL_NO_WARNINGS = os.getenv("YDL_NO_WARNINGS", "true").lower() == "true"
 
-ydl_opts_base = {
+YDL_OPTS_BASE = {
     "format": YDL_FORMAT,
     "noplaylist": YDL_NO_PLAYLIST,
     "ignoreerrors": YDL_IGNORE_ERRORS,
@@ -77,7 +82,7 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
     keyword = prompt_keyword_choice(keyword_choices)
     target_count = prompt_target_count()
     start_date, end_date = prompt_date_range()
-    OUTPUT_FULL_PATH = os.path.join(
+    output_full_path = os.path.join(
         OUTPUT_BASE_PATH, keyword, get_date_range_str(start_date, end_date)
     )
 
@@ -86,22 +91,23 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
         raise ValueError(f"No keyword config defined for '{keyword}'")
 
     return RunConfig(
-        keyword=keyword,
-        keyword_config=keyword_config,
-        target_count=target_count,
-        published_after=start_date,
-        published_before=end_date,
-        batch_size=50,
+        KEYWORD=keyword,
+        KEYWORD_CONFIG=keyword_config,
+        TARGET_COUNT=target_count,
+        PUBLISHED_AFTER=start_date,
+        PUBLISHED_BEFORE=end_date,
+        BATCH_SIZE=50,
         MAX_PAGES=MAX_PAGES,
         OVERSAMPLE=OVERSAMPLE,
+        CANDIDATE_GOAL=target_count * OVERSAMPLE,
         YOUTUBE_API_KEY=YOUTUBE_API_KEY,
-        YDL_OPTS=ydl_opts_base,
-        enable_lufs=ENABLE_LUFS,
-        target_lufs=TARGET_LUFS,
+        YDL_OPTS=YDL_OPTS_BASE,
+        ENABLE_LUFS=ENABLE_LUFS,
+        TARGET_LUFS=TARGET_LUFS,
         OUTPUT_WIDTH=OUTPUT_WIDTH,
         OUTPUT_HEIGHT=OUTPUT_HEIGHT,
         OUTPUT_BASE_PATH=OUTPUT_BASE_PATH,
-        OUTPUT_FULL_PATH=OUTPUT_FULL_PATH,
+        OUTPUT_FULL_PATH=output_full_path,
         TARGET_FPS=TARGET_FPS,
         TITLE_CARD_PATH=TITLE_CARD_PATH,
         TRANSITION_SOUND_PATH=TRANSITION_SOUND_PATH,
@@ -112,18 +118,42 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
     )
 
 
-def main_pipeline(context: PipelineContext):
-    stages = [
-        DiscoverStage(context),
-        DownloadStage(context),
-        PreprocessStage(context),
-        CompileStage(context),
-        MetadataStage(context),
+def main_pipeline(ctx: PipelineContext) -> None:
+    acquire_stages = [
+        DiscoverStage(),
+        FilterStage(),
+        CullStage(),
     ]
 
-    for stage in stages:
-        if stage.should_run():
-            stage.execute()
+    assemble_stages = [
+        ScoreStage(),
+        SelectStage(),
+        DownloadStage(),
+        TransformStage(),
+        CompileStage(),
+        PersistStage(),
+    ]
+
+    # teardown_phase = [CleanStage()]
+
+    while True:
+        for stage in acquire_stages:
+            stage.execute(ctx)
+
+        if ctx.clip_ctx.count_in_state(ClipState.ELIGIBLE) >= ctx.run_config.CANDIDATE_GOAL:
+            print("success")
+            break
+
+        if ctx.query_ctx.pages_fetched >= ctx.run_config.MAX_PAGES:
+            print("reached max pages")
+            break
+
+        if not ctx.query_ctx.cursor:
+            print("exhausted pagination")
+            break
+
+    for stage in assemble_stages:
+        stage.execute(ctx)
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ def normalize_clip_audio(run_config: RunConfig, path: str = None):
         "-i",
         path,
         "-af",
-        f"loudnorm=I={run_config.target_lufs}:TP=-2:LRA=11",
+        f"loudnorm=I={run_config.TARGET_LUFS}:TP=-2:LRA=11",
         "-c:v",
         "copy",
         "-c:a",

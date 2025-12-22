@@ -4,6 +4,7 @@ import isodate
 from googleapiclient.discovery import build
 
 from domain.clip import ClipState, Clip, ClipMetadata, ClipSource
+from domain.pipeline_context import PipelineContext
 from domain.stage import Stage
 from utils.utils import keyword_in_title_or_description
 
@@ -15,27 +16,24 @@ class DiscoverStage(Stage):
     def name(self):
         return "Discover YouTube Shorts"
 
-    def candidate_goal(self) -> int:
-        return self.context.run_config.target_count * self.context.run_config.OVERSAMPLE
-
-    def should_run(self):
-        if len(self.clips_in_state(self.OUTPUT_CLIP_STATE)) >= self.candidate_goal():
+    def should_run(self, ctx: PipelineContext) -> bool:
+        if ctx.clip_ctx.count_in_state(ClipState.ELIGIBLE) >= ctx.run_config.CANDIDATE_GOAL:
             return False
         return True
 
-    def run(self):
-        keyword = self.context.run_config.keyword
-        target_count = self.context.run_config.target_count
-        candidate_goal = self.candidate_goal()
-        max_pages = self.context.run_config.MAX_PAGES
-        batch_size = self.context.run_config.batch_size
+    def run(self, ctx: PipelineContext) -> None:
+        keyword = ctx.run_config.KEYWORD
+        target_count = ctx.run_config.TARGET_COUNT
+        candidate_goal = ctx.run_config.CANDIDATE_GOAL
+        max_pages = ctx.run_config.MAX_PAGES
+        batch_size = ctx.run_config.BATCH_SIZE
         published_after = datetime.combine(
-            self.context.run_config.published_after,
+            ctx.run_config.PUBLISHED_AFTER,
             datetime.min.time(),
             tzinfo=timezone.utc,
         ).isoformat()
         published_before = datetime.combine(
-            self.context.run_config.published_before + timedelta(days=1),
+            ctx.run_config.PUBLISHED_BEFORE + timedelta(days=1),
             datetime.min.time(),
             tzinfo=timezone.utc,
         ).isoformat()
@@ -44,10 +42,10 @@ class DiscoverStage(Stage):
             f"🔍 Fetching Shorts for '{keyword}' | target_count: '{target_count}' | candidate_goal: '{candidate_goal}'"
         )
 
-        candidate_pool = self.clips_in_state(state=self.OUTPUT_CLIP_STATE).copy()
+        candidate_pool = ctx.clip_ctx.clips_in_state(state=self.OUTPUT_CLIP_STATE).copy()
         seen_ids = {c.metadata.id for c in candidate_pool}
 
-        youtube = build("youtube", "v3", developerKey=self.context.run_config.YOUTUBE_API_KEY)
+        youtube = build("youtube", "v3", developerKey=ctx.run_config.YOUTUBE_API_KEY)
         page = 1
         evaluated = 0
         accepted = 0
@@ -154,7 +152,7 @@ class DiscoverStage(Stage):
                     if len(candidate_pool) >= candidate_goal:
                         print(
                             f"✅ Candidate goal reached: {len(candidate_pool)}/{candidate_goal} "
-                            f"(target_count={target_count}, oversample={self.context.run_config.OVERSAMPLE})"
+                            f"(target_count={target_count}, oversample={ctx.run_config.OVERSAMPLE})"
                         )
                         break
 
@@ -169,8 +167,8 @@ class DiscoverStage(Stage):
 
             page += 1
 
-        ineligible_clips = self.clips_not_in_state(self.OUTPUT_CLIP_STATE)
-        self.context.clips = ineligible_clips + candidate_pool
+        ineligible_clips = ctx.clip_ctx.clips_not_in_state(self.OUTPUT_CLIP_STATE)
+        ctx.clips = ineligible_clips + candidate_pool
         print(
             f"📊 Discovery stats: evaluated={evaluated}, accepted={accepted}"
             f", accept_rate={(accepted/max(evaluated,1)):.1%}"

@@ -10,15 +10,6 @@ class Stage(ABC):
     INPUT_CLIP_STATE: ClipState | None = None
     OUTPUT_CLIP_STATE: ClipState | None = None
 
-    def __init__(self, context: PipelineContext):
-        self.context = context
-
-    def clips_in_state(self, state: ClipState):
-        return [c for c in self.context.clips if c.state == state]
-
-    def clips_not_in_state(self, state: ClipState):
-        return [c for c in self.context.clips if c.state != state]
-
     @property
     @abstractmethod
     def name(self) -> str:
@@ -26,19 +17,19 @@ class Stage(ABC):
         pass
 
     @abstractmethod
-    def should_run(self) -> bool:
+    def should_run(self, ctx: PipelineContext) -> bool:
         """Return True if this stage should execute."""
         return True
 
     @abstractmethod
-    def run(self):
+    def run(self, ctx: PipelineContext):
         """Stage-specific behavior."""
-        pass
+        raise NotImplementedError
 
-    def execute(self):
+    def execute(self, ctx: PipelineContext) -> None:
         """Run the stage if should_run() is True."""
-        if self.should_run():
+        if self.should_run(ctx):
             print(f"▶ Running stage: {self.name}")
-            self.run()
+            self.run(ctx)
         else:
             print(f"⏭ Skipping stage: {self.name}")
