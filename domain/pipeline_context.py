@@ -6,9 +6,9 @@ from domain.run_config import RunConfig
 
 
 @dataclass
-class QueryContext:
+class AcquireContext:
     cursor: str | None = None
-    pages_fetched: int = 0
+    pages_processed: int = 0
 
 
 @dataclass
@@ -16,6 +16,14 @@ class ClipContext:
     """Holds state for clip domain objects"""
 
     clips: List[Clip] = field(default_factory=list)
+
+    @property
+    def eligible_clips(self) -> List[Clip]:
+        return self.clips_in_state(state=ClipState.ELIGIBLE)
+
+    @property
+    def eligible_count(self) -> int:
+        return sum(1 for c in self.clips if c.state == ClipState.ELIGIBLE)
 
     def clips_in_state(self, state: ClipState) -> List[Clip]:
         return [c for c in self.clips if c.state == state]
@@ -30,5 +38,5 @@ class ClipContext:
 @dataclass
 class PipelineContext:
     run_config: RunConfig
-    query_ctx: QueryContext
-    clip_ctx: ClipContext
+    acquire: AcquireContext
+    clip: ClipContext

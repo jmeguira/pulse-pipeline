@@ -13,13 +13,17 @@ class RunConfig:
     PUBLISHED_BEFORE: date
     ENABLE_LUFS: bool
     TARGET_LUFS: float
+    # --- Acquisition Loop --- #
     BATCH_SIZE: int
     MAX_PAGES: int
+    ORDER: str
     OVERSAMPLE: int
+    RELEVANCE_LANGUAGE: str
+    REGION_CODE: str
     CANDIDATE_GOAL: int
     YOUTUBE_API_KEY: str
     YDL_OPTS: dict
-    # --- Compilation / Output ---
+    # --- Compilation / Output --- #
     OUTPUT_WIDTH: int
     OUTPUT_HEIGHT: int
     OUTPUT_BASE_PATH: str
@@ -28,7 +32,7 @@ class RunConfig:
     TITLE_CARD_PATH: str
     TRANSITION_SOUND_PATH: str
     TRANSITION_DURATION: float
-    # --- Thumbnail Defaults ---
+    # --- Thumbnail Defaults --- #
     THUMBNAIL_WIDTH: int
     THUMBNAIL_HEIGHT: int
     THUMBNAIL_LOGO_PATH: str

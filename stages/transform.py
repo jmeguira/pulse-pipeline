@@ -12,7 +12,7 @@ from utils.preprocess_utils import normalize_clip_audio, transform_clip
 
 class TransformStage(Stage):
     INPUT_CLIP_STATE = ClipState.DOWNLOADED
-    OUTPUT_CLIP_STATE = ClipState.PROCESSED
+    OUTPUT_CLIP_STATE = ClipState.TRANSFORMED
 
     @property
     def name(self):
@@ -25,7 +25,7 @@ class TransformStage(Stage):
     def run(self, ctx: PipelineContext) -> None:
         for idx, clip in enumerate(
             tqdm(
-                ctx.clip_ctx.clips,
+                ctx.clip.clips,
                 desc="Pre-processing clips",
             )
         ):

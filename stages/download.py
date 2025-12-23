@@ -31,7 +31,7 @@ class DownloadStage(Stage):
 
         with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
             for clip in tqdm(
-                ctx.clip_ctx.clips_in_state(ClipState.ELIGIBLE),
+                ctx.clip.clips_in_state(ClipState.ELIGIBLE),
                 desc=f"Downloading {ctx.run_config.TARGET_COUNT} videos for '{keyword}'",
                 unit="video",
             ):

@@ -19,10 +19,12 @@ class ClipState(str, Enum):
 
     Typical progression (conceptual):
     - DISCOVERED  -> hydrated candidate metadata exists
+    - REJECTED    -> filtered candidate
+    - CULLED      -> deduped candidate
     - ELIGIBLE    -> passed hard gates (shape/constraints); still not "selected"
     - SELECTED    -> chosen for downstream execution (exactly target_count)
     - DOWNLOADED  -> raw media file exists locally
-    - PROCESSED   -> processed media artifact exists (normalized, trimmed, etc.)
+    - TRANSFORMED   -> transformed media artifact exists (normalized, trimmed, etc.)
     - COMPILED    -> incorporated into final compilation output
 
     Terminal / exceptional states:
@@ -34,10 +36,13 @@ class ClipState(str, Enum):
     - Avoid implicit meaning: "eligible" is not the same as "selected."
     """
 
-    ELIGIBLE = "eligible"
-    DOWNLOADED = "downloaded"
-    PROCESSED = "processed"
-    FAILED = "failed"
+    DISCOVERED = "DISCOVERED"
+    REJECTED = "REJECTED"
+    CULLED = "CULLED"
+    ELIGIBLE = "ELIGIBLE"
+    DOWNLOADED = "DOWNLOADED"
+    TRANSFORMED = "TRANSFORMED"
+    FAILED = "FAILED"
 
 
 @dataclass
@@ -56,12 +61,14 @@ class ClipMetadata:
 
     id: str
     title: str
+    description: str
     uploader: str
     channel_id: str
     url: str
     upload_date: str
     view_count: int
     duration: int
+    age_restricted: bool
 
 
 class Clip:

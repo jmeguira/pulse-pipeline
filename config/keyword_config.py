@@ -2,6 +2,18 @@ from domain.keyword_config import KeywordConfig
 
 KEYWORD_CONFIG: dict[str, KeywordConfig] = {
     "cat": KeywordConfig(
+        query_include=[
+            "cat",
+            "cats",
+            "kitten",
+            "kittens",
+            "cat shorts",
+            "funny cat",
+            "funny cats",
+            "cat videos",
+            "shorts",
+        ],
+        query_exclude=["catfish", "catfishing", "caterpillar", "scan"],
         thumbnail_emojis=["😺", "🐾", "😻"],
         title_emojis=["😺"],
         description_emojis=["🐾"],
@@ -9,6 +21,8 @@ KEYWORD_CONFIG: dict[str, KeywordConfig] = {
         hashtags=["#cat", "#cats", "#catshorts", "#funnycats", "#cute"],
     ),
     "funny": KeywordConfig(
+        query_include=[],
+        query_exclude=[],
         thumbnail_emojis=["😂", "🤣", "😹"],
         title_emojis=["😂"],
         description_emojis=["🤣"],
@@ -16,6 +30,8 @@ KEYWORD_CONFIG: dict[str, KeywordConfig] = {
         hashtags=["#funny", "#comedy", "#lol", "#viral"],
     ),
     "gaming": KeywordConfig(
+        query_include=[],
+        query_exclude=[],
         thumbnail_emojis=["🎮", "🔥", "💥"],
         title_emojis=["🎮"],
         description_emojis=["🔥"],
@@ -23,6 +39,8 @@ KEYWORD_CONFIG: dict[str, KeywordConfig] = {
         hashtags=["#gaming", "#gamingshorts", "#gamer", "#viral"],
     ),
     "dogs": KeywordConfig(
+        query_include=[],
+        query_exclude=[],
         thumbnail_emojis=["🐶", "🐾", "❤️"],
         title_emojis=["🐶"],
         description_emojis=["🐾"],
@@ -30,6 +48,8 @@ KEYWORD_CONFIG: dict[str, KeywordConfig] = {
         hashtags=["#dogs", "#dogshorts", "#funnypets", "#cute"],
     ),
     "fails": KeywordConfig(
+        query_include=[],
+        query_exclude=[],
         thumbnail_emojis=["💥", "😬", "🤣"],
         title_emojis=["💥"],
         description_emojis=["🤣"],
@@ -37,6 +57,8 @@ KEYWORD_CONFIG: dict[str, KeywordConfig] = {
         hashtags=["#fails", "#epicfail", "#funnyfails"],
     ),
     "satisfying": KeywordConfig(
+        query_include=[],
+        query_exclude=[],
         thumbnail_emojis=["✨", "🧼", "👌"],
         title_emojis=["✨"],
         description_emojis=["👌"],
@@ -44,6 +66,8 @@ KEYWORD_CONFIG: dict[str, KeywordConfig] = {
         hashtags=["#satisfying", "#oddlysatisfying", "#relaxing"],
     ),
     "memes": KeywordConfig(
+        query_include=[],
+        query_exclude=[],
         thumbnail_emojis=["🧠", "🤣", "🔥"],
         title_emojis=["🤣"],
         description_emojis=["🔥"],

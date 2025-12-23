@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 from config.keyword_config import KEYWORD_CONFIG
 from domain.clip import ClipState
-from domain.pipeline_context import PipelineContext
+from domain.pipeline_context import PipelineContext, AcquireContext, ClipContext
 from domain.run_config import RunConfig
 from stages.compile import CompileStage
 from stages.cull import CullStage
@@ -27,6 +27,9 @@ load_dotenv()
 # --- Fetch/Discover
 MAX_PAGES = int(os.getenv("MAX_PAGES", 100))
 OVERSAMPLE = int(os.getenv("OVERSAMPLE", 10))
+ORDER = os.getenv("ORDER", "relevance")
+RELEVANCE_LANGUAGE = os.getenv("RELEVANCE_LANGUAGE", "en")
+REGION_CODE = os.getenv("REGION_CODE", "us")
 
 # --- Download
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
@@ -98,7 +101,10 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
         PUBLISHED_BEFORE=end_date,
         BATCH_SIZE=50,
         MAX_PAGES=MAX_PAGES,
+        ORDER=ORDER,
         OVERSAMPLE=OVERSAMPLE,
+        RELEVANCE_LANGUAGE=RELEVANCE_LANGUAGE,
+        REGION_CODE=REGION_CODE,
         CANDIDATE_GOAL=target_count * OVERSAMPLE,
         YOUTUBE_API_KEY=YOUTUBE_API_KEY,
         YDL_OPTS=YDL_OPTS_BASE,
@@ -138,18 +144,29 @@ def main_pipeline(ctx: PipelineContext) -> None:
 
     while True:
         for stage in acquire_stages:
+            print("Exiting acquisition phase.")
             stage.execute(ctx)
 
-        if ctx.clip_ctx.count_in_state(ClipState.ELIGIBLE) >= ctx.run_config.CANDIDATE_GOAL:
-            print("success")
+        if ctx.clip.count_in_state(ClipState.ELIGIBLE) >= ctx.run_config.CANDIDATE_GOAL:
+            print(
+                f"✅ Candidate goal reached: {ctx.clip.eligible_count}/{ctx.run_config.CANDIDATE_GOAL} "
+                f"(target_count={ctx.run_config.TARGET_COUNT}, oversample={ctx.run_config.OVERSAMPLE})"
+            )
             break
 
-        if ctx.query_ctx.pages_fetched >= ctx.run_config.MAX_PAGES:
-            print("reached max pages")
+        if ctx.acquire.pages_processed >= ctx.run_config.MAX_PAGES:
+            print(
+                f"🛑 Stopping discovery: hit MAX_PAGES={ctx.run_config.MAX_PAGES} with"
+                f" {ctx.clip.eligible_count}/{ctx.run_config.CANDIDATE_GOAL} candidates."
+                f" Likely: narrow date window, strict gate, or low-signal keyword."
+            )
             break
 
-        if not ctx.query_ctx.cursor:
-            print("exhausted pagination")
+        if not ctx.acquire.cursor:
+            print(
+                f"🛑 End of search results (no nextPageToken) at page {ctx.acquire.pages_processed}. "
+                f"Collected {ctx.clip.eligible_count}/{ctx.run_config.CANDIDATE_GOAL} candidates."
+            )
             break
 
     for stage in assemble_stages:
@@ -158,5 +175,5 @@ def main_pipeline(ctx: PipelineContext) -> None:
 
 if __name__ == "__main__":
     run_config = build_run_config(list(KEYWORD_CONFIG.keys()))
-    context = PipelineContext(run_config=run_config)
+    context = PipelineContext(run_config=run_config, acquire=AcquireContext(), clip=ClipContext())
     main_pipeline(context)

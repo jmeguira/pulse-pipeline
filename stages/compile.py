@@ -19,7 +19,7 @@ from utils.compile_utils import get_outro_clip
 
 
 class CompileStage(Stage):
-    INPUT_CLIP_STATE = ClipState.PROCESSED
+    INPUT_CLIP_STATE = ClipState.TRANSFORMED
 
     @property
     def name(self):
@@ -27,8 +27,8 @@ class CompileStage(Stage):
 
     def should_run(self, ctx: PipelineContext) -> bool:
         if (
-            ctx.clip_ctx.clips_in_state(ClipState.ELIGIBLE)
-            > ctx.run_config.TARGET_COUNT
+            ctx.clip.count_in_state(ClipState.ELIGIBLE)
+            >= ctx.run_config.TARGET_COUNT
         ):
             return True
         else:
@@ -47,7 +47,7 @@ class CompileStage(Stage):
         target_fps = ctx.run_config.TARGET_FPS
 
         # Sort videos by view count ascending
-        ctx.clip_ctx.clips.sort(key=lambda v: v.metadata.view_count)
+        ctx.clip.clips.sort(key=lambda v: v.metadata.view_count)
 
         if not Path(transition_sound_path).exists():
             raise Exception(
@@ -73,8 +73,8 @@ class CompileStage(Stage):
             print(f"⚠ No title card found at {title_card_path}")
             return
 
-        num_clips = len(ctx.clip_ctx.clips)
-        for idx, clip in enumerate(tqdm(ctx.clip_ctx.clips, "Compiling clips")):
+        num_clips = len(ctx.clip.clips)
+        for idx, clip in enumerate(tqdm(ctx.clip.clips, "Compiling clips")):
             if not clip.is_stage_ready(self.INPUT_CLIP_STATE):
                 continue
             try:

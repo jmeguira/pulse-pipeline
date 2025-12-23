@@ -1,250 +1,144 @@
-# Pulse Check
-
-**Signal-first video discovery, filtering, and compilation.**
-
-Pulse Check is an internal, state-driven pipeline for tapping into internet throughput around a thematic cluster,
-refining aggressively for signal, and producing compiled outputs. It is designed to be bounded, rerunnable, and boring
-to operate.
+# Product Roadmap — Pulse
 
 ---
 
-## North Star
+## 🧭 Compass — Current Orientation
 
-Build a rerunnable, signal-first content pipeline that discovers, filters, deduplicates, ranks, and compiles
-high-quality short-form video into reusable outputs with minimal operator overhead.
+**What Pulse is**
 
----
+- A system that **samples what’s resonating now** within a topic and renders it as video.
+- Not predictive. Not exhaustive. **Observational and lightweight** by design.
 
-## Mental Model (one line)
+**What matters right now**
 
-> **Discover broadly, filter hard, dedup aggressively, rank cleanly, commit late.**
+- Maintain a **wide top-of-funnel** and learn from real outputs.
+- Optimize for **signal discovery**, not framework completeness.
+- Bias toward **shipping artifacts** over architectural elegance.
 
----
+**What Pulse is not (yet)**
 
-## Pipeline Diagram
+- Not a generalized engine for scale.
+- Not a precision relevance model.
+- Not an editorially perfected product.
 
-             ┌──────────┐
-             │ Discover │
-             └────┬─────┘
-                  │
-             ┌────▼─────┐
-             │  Filter  │   (hard gates only)
-             └────┬─────┘
-                  │
-             ┌────▼─────┐
-             │  Dedup   │   (pool / history relative)
-             └────┬─────┘
-                  │
-      ┌───────────▼───────────┐
-      │  Acquisition Loop     │
-      │  (repeat until pool   │
-      │   ≥ candidate_goal)   │
-      └───────────┬───────────┘
-                  │
-             ┌────▼─────┐
-             │  Score   │   (never rejects)
-             └────┬─────┘
-                  │
-             ┌────▼─────┐
-             │  Select  │   (choose target_count)
-             └────┬─────┘
-                  │
-      ┌───────────▼───────────┐
-      │   Execution Stages    │
-      │ Download → Preprocess │
-      │        → Compile      │
-      └───────────┬───────────┘
-                  │
-             ┌────▼─────┐
-             │ Persist  │   (record provenance)
-             └────┬─────┘
-                  │
-             ┌────▼─────┐
-             │  Clean   │   (remove leftovers)
-             └──────────┘
+**Operating principles**
+
+- One run produces one video.
+- Prefer derived state over duplicated counters.
+- Expand scope **only at points of friction**.
+- Treat search as a hinting system; shape downstream.
+- Preserve readability to reduce cognitive load.
 
 ---
 
-## Phase 0 — Foundations (Mostly Done)
+## Status Summary (Current)
 
-**Goal:** Establish a stable, debuggable single-run pipeline with clear contracts.
-
-- Sequential pipeline scaffold
-- `Clip` + `ClipMetadata` as central domain objects
-- `PipelineContext` (run_config + clips)
-- Stage base class with clear contracts
-- Download + preprocess robustness (file checks, failure logging)
-- Compile MVP (title card, countdown, transitions)
-- Handoff artifacts + initial architecture snapshot
+- Pipeline **already produces and uploads videos**
+- MVP script proven; pipeline formalized afterward
+- Multiple successful end-to-end runs and uploads
+- Current focus: **acquisition quality + control tightening**, not basic viability
 
 ---
 
-## Phase 1 — Infra & Pipeline Hardening (Active)
+## Phase 0 — MVP Proven (✅ Complete)
 
-**Goal:** Make the system boring, bounded, and safe to rerun.
+**Goal:** Prove end-to-end feasibility
 
-### State & Contracts
+- Single-script MVP:
+    - Query YouTube
+    - Download clips
+    - Compile video
+    - Upload successfully
+- Manual configuration
+- Multiple successful uploads
 
-- Explicit ClipState lifecycle
-- Forward-only state transitions
-- State-based include/exclude helpers (`clips_in_state`, `clips_not_in_state`)
-- Stage-level `should_run()` for rerun safety where appropriate
-
-### Discovery Hardening
-
-- Bounded discovery via `candidate_goal = target_count * OVERSAMPLE`
-- `MAX_PAGES` safety cap
-- Deduplication by source ID during discovery (within-run)
-- Atomic merge of newly discovered candidates with existing clip pool
-- Explicit discovery exit reasons + diagnostics (evaluated / accepted / accept rate)
-
-### Execution Safety
-
-- Idempotent stages (skip when artifacts exist)
-- No downstream stage may increase clip count after selection
-- Runtime modes planned (ingest-only / compile-only / end-to-end)
+**Outcome:** System viability confirmed
 
 ---
 
-## Phase 2 — Acquire: Discover, Filter, Dedup (Next)
+## Phase 1 — Pipeline Formalization (✅ Largely Complete)
 
-**Goal:** Build a bounded acquisition loop that produces a sufficiently large, clean eligible pool for ranking and
-selection.
+**Goal:** Turn MVP into a maintainable pipeline
 
-### Discover
+- Stage-based pipeline introduced
+- Context-driven execution
+- Explicit orchestrator
+- Acquire → Assemble flow
+- Multiple verified pipeline states
 
-- Enumerate candidates and hydrate required metadata
-- Bounded by `candidate_goal` and `MAX_PAGES`
-- Output: `DISCOVERED` (preferred) or transitional candidate state
-
-### Filter (Hard Gate)
-
-- Pass/fail only (intrinsic constraints)
-- Duration, age restriction, topic/keyword match, language sanity (optional)
-- Record structured rejection reasons + counts
-- Output: `ELIGIBLE`
-
-### Dedup (Pool/History Gate)
-
-- Separate from Filter (different semantics + future DB/persistence hooks)
-- v0: cheap heuristics (e.g., normalized-title matching, pattern checks)
-- v1: exact ID + pool-relative checks
-- v2: optional persistence-backed checks (DB) and near-duplicate fingerprinting
-- Output: `ELIGIBLE` (deduped pool)
-
-### Acquisition Loop (State Machine)
-
-- Loop **Discover → Filter → Dedup** until:
-    - `len(ELIGIBLE_DEDUPED) >= candidate_goal`, or
-    - bounds exhausted (`MAX_PAGES` / quotas / end of results)
-- Persist “seen” memory across loop iterations (IDs/titles/fingerprints)
+**Outcome:** Working pipeline with clear structure
 
 ---
 
-## Phase 3 — Rank & Commit: Score, Select (Next)
+## Phase 2 — Acquisition Tightening (🟡 In Progress)
 
-**Goal:** Rank a clean pool and commit resources only to the best clips.
+**Goal:** Improve top-of-funnel signal quality without narrowing too early
 
-### Score (Soft Ranking)
+- Refined Discover stage:
+    - Date-bounded popularity sampling
+    - Shorts bias (`videoDuration="short"`)
+    - Configurable ordering (`viewCount` vs `relevance`)
+    - Language & region bias
+- Introduced `keyword_config`:
+    - Include / exclude terms
+    - Composable query builder
+- Clarified acquisition state:
+    - `pages_processed`
+    - `discovered`, `rejected`, `culled`
+- Filter / Cull temporarily bypassable to preserve momentum
 
-- Attach score components
-- Never rejects
-- Fully rerunnable
-- Output: `ELIGIBLE` + score metadata
-
-### Select
-
-- Choose exactly `target_count`
-- Output: `SELECTED`
-- v0: simple sort + slice
-- v1+: diversity, fatigue penalties, paradigm-aware selection
-
----
-
-## Phase 4 — Execute: Download, Preprocess, Compile (Ongoing)
-
-**Goal:** Artifact-producing stages that run only on `SELECTED`.
-
-- Download: produce `DOWNLOADED`, idempotent via file existence checks
-- Preprocess: produce `PROCESSED`, idempotent
-- Compile: produce `COMPILED` output(s), deterministic ordering
+**Outcome:** Wide but better-shaped candidate pool
 
 ---
 
-## Phase 5 — Persist, Then Clean (Planned)
+## Phase 3 — Signal Shaping (🔜 Next)
 
-**Goal:** Record provenance and results, then safely remove run leftovers.
+**Goal:** Reduce junk, improve consistency
 
-### Persist
+- Implement Filter stage (cheap hard rejects)
+- Implement Cull stage (run-scoped dedup)
+- Minimal reason codes
+- Persist `clips.json` for inspection
 
-- Persist run outcomes and provenance (metadata-first)
-- Record: eligibility results, rejection reasons, dedup outcomes, scores, selection outcomes
-- Record: output artifact paths, sizes/checksums (optional), failures
-- Write-only initially; read-path added later with content pool
-
-### Clean
-
-- Remove temporary/intermediate artifacts safely
-- Prune unselected downloads and partial/failed outputs
-- Safe to skip during debugging
-- Runs after Persist
+**Outcome:** Cleaner pool entering selection
 
 ---
 
-## Phase 6 — Fingerprinting & Cross-Run Dedup (P0–P1)
+## Phase 4 — Selection & Scoring Improvements (🔜 Later)
 
-**Goal:** Prevent repeats and near-duplicates across runs.
+**Goal:** Pick better clips, not more clips
 
-- Metadata similarity
-- Perceptual frame hashing
-- Optional audio fingerprinting
-- Cross-run dedup once persistence exists
+- Lightweight scoring (views/day, engagement ratios)
+- Selection policies (top-N, simple diversity)
+- Keyword-specific tuning
 
----
-
-## Phase 7 — Persistence & Content Pool (P1)
-
-**Goal:** Let clips outlive a single run.
-
-- Metadata-first DB (SQLite MVP → Postgres)
-- Write-only initially; read-path later
-- Persist: eligibility, scores, selection outcomes, usage history
-- Enable: pool reuse, fatigue penalties, cross-run dedup
+**Outcome:** Higher-quality compilations with minimal added complexity
 
 ---
 
-## Phase 8 — Editorial & Output Polish (P1–P2)
+## Phase 5 — Editorial & UX Polish (🟢 Optional / Later)
 
-**Goal:** Decouple video structure from ingestion logic.
+**Goal:** Improve viewer experience
 
-- Explicit Curate / Editorialize stage
-- Paradigms: countdown, thematic grouping, random montage
-- Audio/visual polish
-- Dual-format outputs (vertical + horizontal)
-
----
-
-## Phase 9 — Orchestration & Scale (Future)
-
-**Goal:** Move from single-run toolkit to continuous engine.
-
-- Orchestration (cron / queue / workflow)
-- Topic-based nugget engine
-- Multi-source ingestion (optional)
-
----
-
-## Engineering Level-Up (Cross-Cutting)
-
-- Idempotent, resumable stages
-- Structured per-run/per-stage logs
-- Minimal tests (wiring, state transitions, date logic)
-- Handoff-quality documentation
+- Title / description generation
+- Transitions and pacing polish
+- Intro / outro standardization
+- Thematic consistency per keyword
 
 ---
 
 ## Explicit Non-Goals (for now)
 
-- Microservices-first architecture
-- Premature ML-driven ranking
-- Early read-path persistence
+- Large-scale engine optimization
+- Persistent DB-backed history
+- Full idempotency across reruns
+- ML-based relevance models
+- GUI tooling
+
+These are **earned later**, not now.
+
+---
+
+## One-line internal definition
+
+> Pulse samples what’s resonating now, renders it honestly, and gets out of the way.

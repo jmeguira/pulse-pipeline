@@ -17,7 +17,7 @@ class PersistStage(Stage):
     def run(self, ctx: PipelineContext) -> None:
         run_config = ctx.run_config
         output_path = ctx.run_config.OUTPUT_FULL_PATH
-        clips = ctx.clip_ctx.clips
+        clips = ctx.clip.clips
 
         # --- Generate title & description ---
         title = get_compilation_title(
