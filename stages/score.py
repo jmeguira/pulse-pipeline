@@ -4,13 +4,13 @@ from domain.stage import Stage
 
 
 class ScoreStage(Stage):
-    INPUT_CLIP_STATE: ClipState | None = None
-    OUTPUT_CLIP_STATE: ClipState | None = None
+    INPUT_CLIP_STATE = ClipState.SELECTED
+    # OUTPUT_CLIP_STATE = ClipState.SCORED
 
     @property
     def name(self) -> str:
         """Score Stage"""
-        return "score stage"
+        return "<SCORE>"
 
     def should_run(self, ctx: PipelineContext) -> bool:
         return True

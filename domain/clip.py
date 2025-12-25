@@ -26,6 +26,7 @@ class ClipState(str, Enum):
     - DOWNLOADED  -> raw media file exists locally
     - TRANSFORMED   -> transformed media artifact exists (normalized, trimmed, etc.)
     - COMPILED    -> incorporated into final compilation output
+    - PERSISTED  -> persisted clip metadata and runlog
 
     Terminal / exceptional states:
     - REJECTED    -> failed a hard gate (reason should be recorded)
@@ -40,8 +41,11 @@ class ClipState(str, Enum):
     REJECTED = "REJECTED"
     CULLED = "CULLED"
     ELIGIBLE = "ELIGIBLE"
+    SELECTED = "SELECTED"
     DOWNLOADED = "DOWNLOADED"
     TRANSFORMED = "TRANSFORMED"
+    COMPILED = "COMPILED"
+    PERSISTED = "PERSISTED"
     FAILED = "FAILED"
 
 
@@ -116,5 +120,13 @@ class Clip:
     def is_stage_ready(self, stage_state: ClipState) -> bool:
         return self.state == stage_state
 
-    def __repr__(self):
-        return f"<{self.source} Clip: state={self.state} id={self.id}>"
+    def __repr__(self) -> str:
+        return (
+            f"<Clip "
+            f"id={self.id[:8]} "
+            f"state={self.state.name} "
+            f"source={self.source.name} "
+            f"raw={'Y' if self.raw_path else 'N'} "
+            f"processed={'Y' if self.processed_path else 'N'} "
+            f"failure={self.failure_reason or '-'}>"
+        )

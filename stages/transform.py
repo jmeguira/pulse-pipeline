@@ -16,7 +16,7 @@ class TransformStage(Stage):
 
     @property
     def name(self):
-        return "Transform Clips"
+        return "<TRANSFORM>"
 
     def should_run(self, ctx: PipelineContext) -> bool:
         # e.g., skip if clips are already normalized
@@ -57,13 +57,12 @@ class TransformStage(Stage):
                         fps=ctx.run_config.TARGET_FPS,
                         codec="libx264",
                         audio_codec="aac",
-                        verbose=False,
                         logger=None,
                     )
                     clip.processed_path = processed_output_path
-                    clip.set_state(ClipState.PROCESSED)
+                    clip.set_state(self.OUTPUT_CLIP_STATE)
 
             except Exception as e:
                 clip.set_state(ClipState.FAILED)
-                clip.failure_reason = f"❌ Failed to pre-process {str(clip)}\n\nError: {str(e)}"
+                clip.failure_reason = f"Failed to pre-process {str(clip)}\n\nError: {str(e)}"
         pass

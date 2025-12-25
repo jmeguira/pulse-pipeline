@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -15,6 +16,7 @@ from stages.persist import PersistStage
 from stages.score import ScoreStage
 from stages.select import SelectStage
 from stages.transform import TransformStage
+from utils.flag_utils import load_flags
 from utils.utils import (
     prompt_keyword_choice,
     prompt_date_range,
@@ -144,19 +146,18 @@ def main_pipeline(ctx: PipelineContext) -> None:
 
     while True:
         for stage in acquire_stages:
-            print("Exiting acquisition phase.")
             stage.execute(ctx)
 
-        if ctx.clip.count_in_state(ClipState.ELIGIBLE) >= ctx.run_config.CANDIDATE_GOAL:
+        if ctx.clip.count_clips_in_state(ClipState.ELIGIBLE) >= ctx.run_config.CANDIDATE_GOAL:
             print(
-                f"✅ Candidate goal reached: {ctx.clip.eligible_count}/{ctx.run_config.CANDIDATE_GOAL} "
+                f"Candidate goal reached: {ctx.clip.eligible_count}/{ctx.run_config.CANDIDATE_GOAL} "
                 f"(target_count={ctx.run_config.TARGET_COUNT}, oversample={ctx.run_config.OVERSAMPLE})"
             )
             break
 
         if ctx.acquire.pages_processed >= ctx.run_config.MAX_PAGES:
             print(
-                f"🛑 Stopping discovery: hit MAX_PAGES={ctx.run_config.MAX_PAGES} with"
+                f"Stopping discovery: hit MAX_PAGES={ctx.run_config.MAX_PAGES} with"
                 f" {ctx.clip.eligible_count}/{ctx.run_config.CANDIDATE_GOAL} candidates."
                 f" Likely: narrow date window, strict gate, or low-signal keyword."
             )
@@ -164,7 +165,7 @@ def main_pipeline(ctx: PipelineContext) -> None:
 
         if not ctx.acquire.cursor:
             print(
-                f"🛑 End of search results (no nextPageToken) at page {ctx.acquire.pages_processed}. "
+                f"End of search results (no nextPageToken) at page {ctx.acquire.pages_processed}. "
                 f"Collected {ctx.clip.eligible_count}/{ctx.run_config.CANDIDATE_GOAL} candidates."
             )
             break
@@ -175,5 +176,8 @@ def main_pipeline(ctx: PipelineContext) -> None:
 
 if __name__ == "__main__":
     run_config = build_run_config(list(KEYWORD_CONFIG.keys()))
-    context = PipelineContext(run_config=run_config, acquire=AcquireContext(), clip=ClipContext())
+    flags = load_flags(Path("flags.json"))
+    context = PipelineContext(
+        run_config=run_config, acquire=AcquireContext(), clip=ClipContext(), flags=flags
+    )
     main_pipeline(context)

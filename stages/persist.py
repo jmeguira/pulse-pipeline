@@ -1,14 +1,18 @@
 import os
 
+from domain.clip import ClipState
 from domain.pipeline_context import PipelineContext
 from domain.stage import Stage
 from utils.metadata_utils import get_compilation_title, get_compilation_description
 
 
 class PersistStage(Stage):
+    INPUT_CLIP_STATE = ClipState.COMPILED
+    OUTPUT_CLIP_STATE = ClipState.PERSISTED
+
     @property
     def name(self):
-        return "Persist Stage"
+        return "<PERSIST>"
 
     def should_run(self, ctx: PipelineContext) -> bool:
         # e.g., skip if title/description already exist

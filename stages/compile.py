@@ -20,14 +20,15 @@ from utils.compile_utils import get_outro_clip
 
 class CompileStage(Stage):
     INPUT_CLIP_STATE = ClipState.TRANSFORMED
+    OUTPUT_CLIP_STATE = ClipState.COMPILED
 
     @property
     def name(self):
-        return "Compile Video"
+        return "<COMPILE>"
 
     def should_run(self, ctx: PipelineContext) -> bool:
         if (
-            ctx.clip.count_in_state(ClipState.ELIGIBLE)
+            ctx.clip.count_clips_in_state(ClipState.ELIGIBLE)
             >= ctx.run_config.TARGET_COUNT
         ):
             return True
@@ -47,7 +48,7 @@ class CompileStage(Stage):
         target_fps = ctx.run_config.TARGET_FPS
 
         # Sort videos by view count ascending
-        ctx.clip.clips.sort(key=lambda v: v.metadata.view_count)
+        ctx.clip.clips_in_state(ClipState.DOWNLOADED).sort(key=lambda v: v.metadata.view_count)
 
         if not Path(transition_sound_path).exists():
             raise Exception(
@@ -74,7 +75,9 @@ class CompileStage(Stage):
             return
 
         num_clips = len(ctx.clip.clips)
-        for idx, clip in enumerate(tqdm(ctx.clip.clips, "Compiling clips")):
+        downloaded = ctx.clip.clips_in_state(ClipState.TRANSFORMED)
+        for idx, clip in enumerate(tqdm(downloaded, "Compiling clips")):
+            print(clip)
             if not clip.is_stage_ready(self.INPUT_CLIP_STATE):
                 continue
             try:
@@ -97,6 +100,7 @@ class CompileStage(Stage):
                 output_clips.append(transition_clip)
                 content_clip = VideoFileClip(clip.processed_path)
                 output_clips.append(content_clip)
+                clip.state = self.OUTPUT_CLIP_STATE
 
             except Exception as e:
                 print(f"⚠ Failed to compile {str(clip)}: error{str(e)}")

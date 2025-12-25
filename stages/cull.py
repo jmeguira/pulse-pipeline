@@ -5,15 +5,28 @@ from domain.stage import Stage
 
 class CullStage(Stage):
 
-    INPUT_CLIP_STATE: ClipState | None = None
-    OUTPUT_CLIP_STATE: ClipState | None = None
+    INPUT_CLIP_STATE = ClipState.ELIGIBLE
+    OUTPUT_CLIP_STATE: ClipState.REJECTED
 
     @property
     def name(self) -> str:
-        return "cull stage"
+        return "<CULL>"
 
     def should_run(self, ctx: PipelineContext) -> bool:
         return True
 
     def run(self, ctx: PipelineContext) -> None:
-        pass
+        # TEMP: Sorting by view_count and truncating to target_count for testing
+        eligible_count = ctx.clip.count_clips_in_state(ClipState.ELIGIBLE)
+        candidates_needed = ctx.run_config.CANDIDATE_GOAL - eligible_count
+        if candidates_needed <= 0:
+            return
+
+        discovered = sorted(
+            ctx.clip.clips_in_state(ClipState.DISCOVERED),
+            key=lambda c: c.metadata.view_count or 0,
+            reverse=True,
+        )
+
+        for clip in discovered[:candidates_needed]:
+            clip.state = ClipState.ELIGIBLE

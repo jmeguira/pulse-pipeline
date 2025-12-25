@@ -10,12 +10,12 @@ from domain.stage import Stage
 
 
 class DownloadStage(Stage):
-    INPUT_CLIP_STATE = ClipState.ELIGIBLE
+    INPUT_CLIP_STATE = ClipState.SELECTED
     OUTPUT_CLIP_STATE = ClipState.DOWNLOADED
 
     @property
     def name(self):
-        return "Download videos"
+        return "<DOWNLOAD>"
 
     def should_run(self, ctx: PipelineContext) -> bool:
         return True
@@ -31,7 +31,7 @@ class DownloadStage(Stage):
 
         with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
             for clip in tqdm(
-                ctx.clip.clips_in_state(ClipState.ELIGIBLE),
+                ctx.clip.clips_in_state(ClipState.SELECTED),
                 desc=f"Downloading {ctx.run_config.TARGET_COUNT} videos for '{keyword}'",
                 unit="video",
             ):
@@ -41,7 +41,7 @@ class DownloadStage(Stage):
                     ydl.download(clip.metadata.url)
                 except Exception as e:
                     clip.set_state(ClipState.FAILED)
-                    clip.failure_reason = f"❌ Failed to download {str(clip)}\n\nError: {str(e)}"
+                    clip.failure_reason = f"Failed to download {str(clip)}\n\nError: {str(e)}"
                     continue
 
                 clip.set_state(ClipState.DOWNLOADED)

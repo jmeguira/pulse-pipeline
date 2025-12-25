@@ -19,7 +19,7 @@ class DiscoverStage(Stage):
 
     @property
     def name(self):
-        return "Discover YouTube Shorts"
+        return "<DISCOVER>"
 
     def should_run(self, ctx: PipelineContext) -> bool:
         if ctx.clip.eligible_count >= ctx.run_config.CANDIDATE_GOAL:
@@ -44,7 +44,7 @@ class DiscoverStage(Stage):
         ).isoformat()
 
         print(
-            f"🔍 Fetching Shorts for '{keyword}' | target_count: '{target_count}' | candidate_goal: '{candidate_goal}'"
+            f"Fetching Shorts for '{keyword}' | target_count: '{target_count}' | candidate_goal: '{candidate_goal}'"
         )
 
         candidate_pool = ctx.clip.eligible_clips.copy()
@@ -75,7 +75,7 @@ class DiscoverStage(Stage):
                 .execute()
             )
         except Exception as e:
-            raise Exception(f"❌ YouTube search failed on page {ctx.acquire.pages_processed + 1} (token={ctx.acquire.cursor}): {e}")
+            raise Exception(f"Error: YouTube search failed on page {ctx.acquire.pages_processed + 1} (token={ctx.acquire.cursor}): {e}")
 
         ctx.acquire.pages_processed += 1
         ctx.acquire.cursor = search_resp.get("nextPageToken")
@@ -90,7 +90,7 @@ class DiscoverStage(Stage):
 
         if not video_ids:
             raise Exception(
-                f"🛑 No results returned on page {ctx.acquire.pages_processed} (token={ctx.acquire.cursor}). "
+                f"Error: No results returned on page {ctx.acquire.pages_processed} (token={ctx.acquire.cursor}). "
                 f"Stopping with {len(candidate_pool)}/{candidate_goal} candidates."
             )
 
@@ -104,7 +104,7 @@ class DiscoverStage(Stage):
                 .execute()
             )
         except Exception as e:
-            raise Exception(f"❌ videos.list failed for {len(video_ids)} ids on page {ctx.acquire.pages_processed}: {e}")
+            raise Exception(f"Error: videos.list failed for {len(video_ids)} ids on page {ctx.acquire.pages_processed}: {e}")
 
         for video in videos_resp.get("items", []):
             id = video["id"]
@@ -126,7 +126,7 @@ class DiscoverStage(Stage):
             candidate_pool.append(
                 Clip(
                     source=ClipSource.YOUTUBE,
-                    state=ClipState.ELIGIBLE,
+                    state=ClipState.DISCOVERED,
                     metadata=ClipMetadata(
                         id=id,
                         title=title,
@@ -143,10 +143,10 @@ class DiscoverStage(Stage):
             )
             if len(candidate_pool) >= candidate_goal:
                 print(
-                    f"✅ Candidate goal reached: {len(candidate_pool)}/{candidate_goal} "
+                    f"Candidate goal reached: {len(candidate_pool)}/{candidate_goal} "
                     f"(target_count={target_count}, oversample={ctx.run_config.OVERSAMPLE})"
                 )
                 break
 
         ineligible_clips = ctx.clip.clips_not_in_state(state=ClipState.ELIGIBLE)
-        ctx.clips = ineligible_clips + candidate_pool
+        ctx.clip.clips = ineligible_clips + candidate_pool

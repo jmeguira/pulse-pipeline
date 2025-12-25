@@ -5,12 +5,12 @@ from domain.stage import Stage
 
 class FilterStage(Stage):
 
-    INPUT_CLIP_STATE: ClipState | None = None
-    OUTPUT_CLIP_STATE: ClipState | None = None
+    INPUT_CLIP_STATE = ClipState.ELIGIBLE
+    OUTPUT_CLIP_STATE: ClipState.REJECTED
 
     @property
     def name(self) -> str:
-        return "filter stage"
+        return "<FILTER>"
 
     def should_run(self, ctx: PipelineContext) -> bool:
         return True

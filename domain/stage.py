@@ -31,5 +31,6 @@ class Stage(ABC):
         if self.should_run(ctx):
             print(f"▶ Running stage: {self.name}")
             self.run(ctx)
+            print(ctx)
         else:
             print(f"⏭ Skipping stage: {self.name}")

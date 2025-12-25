@@ -21,7 +21,7 @@ KEYWORD_CONFIG: dict[str, KeywordConfig] = {
         hashtags=["#cat", "#cats", "#catshorts", "#funnycats", "#cute"],
     ),
     "funny": KeywordConfig(
-        query_include=[],
+        query_include=["funny"],
         query_exclude=[],
         thumbnail_emojis=["😂", "🤣", "😹"],
         title_emojis=["😂"],

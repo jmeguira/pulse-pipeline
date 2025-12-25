@@ -1,0 +1,7 @@
+{
+  "log_level": "debug",
+  "dry_run": true,
+  "strict": false,
+  "save_intermediates": false,
+  "profile": false
+}
