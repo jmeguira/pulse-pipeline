@@ -38,7 +38,7 @@ class ClipContext:
     def count_clips_in_state(self, state: ClipState) -> int:
         return sum(1 for c in self.clips if c.state == state)
 
-    def count_clips_by_state(self, compact: bool = True):
+    def count_clips_by_state(self, compact: bool = True) -> str:
         state_counts = Counter(clip.state for clip in self.clips)
 
         if compact:

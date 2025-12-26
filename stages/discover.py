@@ -5,7 +5,7 @@ from googleapiclient.discovery import build
 
 from domain.clip import ClipState, Clip, ClipMetadata, ClipSource
 from domain.pipeline_context import PipelineContext
-from domain.stage import Stage
+from domain.stage import Stage, StageGroup
 
 
 def build_query(ctx: PipelineContext) -> str:
@@ -16,12 +16,13 @@ def build_query(ctx: PipelineContext) -> str:
 
 class DiscoverStage(Stage):
     OUTPUT_CLIP_STATE = ClipState.ELIGIBLE
+    STAGE_GROUP = StageGroup.DISCOVER
 
     @property
     def name(self):
         return "<DISCOVER>"
 
-    def should_run(self, ctx: PipelineContext) -> bool:
+    def is_stage_enabled(self, ctx: PipelineContext) -> bool:
         if ctx.clip.eligible_count >= ctx.run_config.CANDIDATE_GOAL:
             return False
         return True

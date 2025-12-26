@@ -74,6 +74,34 @@ class ClipMetadata:
     duration: int
     age_restricted: bool
 
+    def __repr__(self) -> str:
+        title = (self.title[:60] + "…") if len(self.title) > 60 else self.title
+        return (
+            "ClipMetadata("
+            f"id={self.id}, "
+            f"title={title!r}, "
+            f"uploader={self.uploader!r}, "
+            f"upload_date={self.upload_date}, "
+            f"url={self.url}, "
+            f"view_count={self.view_count}, "
+            f"duration={self.duration}s, "
+            f"age_restricted={self.age_restricted}"
+            ")"
+        )
+
+    def to_dict(self) -> dict:
+        title = (self.title[:60] + "…") if len(self.title) > 60 else self.title
+        return {
+            "id": self.id[:8],
+            "title": title,
+            "uploader": self.uploader,
+            "upload_date": self.upload_date,
+            "url": self.url,
+            "view_count": self.view_count,
+            "duration": self.duration,
+            "age_restricted": self.age_restricted,
+        }
+
 
 class Clip:
     """
@@ -128,5 +156,15 @@ class Clip:
             f"source={self.source.name} "
             f"raw={'Y' if self.raw_path else 'N'} "
             f"processed={'Y' if self.processed_path else 'N'} "
-            f"failure={self.failure_reason or '-'}>"
+            f"failure={self.failure_reason or '-'}"
+            f"\nmetadata={self.metadata}>"
         )
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id[:8],
+            "state": self.state.name,
+            "source": self.source.name,
+            "failure_reason": self.failure_reason,
+            "metadata": self.metadata.to_dict(),
+        }

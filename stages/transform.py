@@ -6,19 +6,20 @@ from tqdm import tqdm
 
 from domain.clip import ClipState
 from domain.pipeline_context import PipelineContext
-from domain.stage import Stage
+from domain.stage import Stage, StageGroup
 from utils.preprocess_utils import normalize_clip_audio, transform_clip
 
 
 class TransformStage(Stage):
     INPUT_CLIP_STATE = ClipState.DOWNLOADED
     OUTPUT_CLIP_STATE = ClipState.TRANSFORMED
+    STAGE_GROUP = StageGroup.ASSEMBLE
 
     @property
     def name(self):
         return "<TRANSFORM>"
 
-    def should_run(self, ctx: PipelineContext) -> bool:
+    def is_stage_enabled(self, ctx: PipelineContext) -> bool:
         # e.g., skip if clips are already normalized
         return True
 

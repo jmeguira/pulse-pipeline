@@ -7,6 +7,7 @@ from config.keyword_config import KEYWORD_CONFIG
 from domain.clip import ClipState
 from domain.pipeline_context import PipelineContext, AcquireContext, ClipContext
 from domain.run_config import RunConfig
+from domain.stage import StageGroup, Stage
 from stages.compile import CompileStage
 from stages.cull import CullStage
 from stages.discover import DiscoverStage
@@ -126,6 +127,12 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
     )
 
 
+def is_group_enabled(ctx: PipelineContext, stage: Stage, group: StageGroup) -> bool:
+    if ctx.flags.dry_run:
+        return stage.STAGE_GROUP is group
+    return True
+
+
 def main_pipeline(ctx: PipelineContext) -> None:
     acquire_stages = [
         DiscoverStage(),
@@ -171,12 +178,17 @@ def main_pipeline(ctx: PipelineContext) -> None:
             break
 
     for stage in assemble_stages:
+        if ctx.flags.dry_run:
+            if not is_group_enabled(ctx, stage, StageGroup.DISCOVER):
+                print(f"⏭ Skipping stage: {stage.name}")
+                continue
         stage.execute(ctx)
 
 
 if __name__ == "__main__":
     run_config = build_run_config(list(KEYWORD_CONFIG.keys()))
     flags = load_flags(Path("flags.json"))
+    print(flags)
     context = PipelineContext(
         run_config=run_config, acquire=AcquireContext(), clip=ClipContext(), flags=flags
     )

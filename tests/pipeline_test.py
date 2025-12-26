@@ -63,7 +63,7 @@ def test_pipeline_runs_all_stages():
     ]
 
     for stage in stages:
-        stage.should_run = Mock(return_value=True)
+        stage.is_stage_enabled = Mock(return_value=True)
 
     # Stub run() on each stage
     for stage in stages:
@@ -71,7 +71,7 @@ def test_pipeline_runs_all_stages():
 
     # Simulate pipeline execution
     for stage in stages:
-        if stage.should_run():
+        if stage.is_stage_enabled():
             stage.run()
 
     # Assert every stage ran exactly once

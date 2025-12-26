@@ -2,19 +2,20 @@ import os
 
 from domain.clip import ClipState
 from domain.pipeline_context import PipelineContext
-from domain.stage import Stage
+from domain.stage import Stage, StageGroup
 from utils.metadata_utils import get_compilation_title, get_compilation_description
 
 
 class PersistStage(Stage):
     INPUT_CLIP_STATE = ClipState.COMPILED
     OUTPUT_CLIP_STATE = ClipState.PERSISTED
+    STAGE_GROUP = StageGroup.ASSEMBLE
 
     @property
     def name(self):
         return "<PERSIST>"
 
-    def should_run(self, ctx: PipelineContext) -> bool:
+    def is_stage_enabled(self, ctx: PipelineContext) -> bool:
         # e.g., skip if title/description already exist
         return True
 

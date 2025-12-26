@@ -21,3 +21,14 @@ class RuntimeFlags:
             save_intermediates=bool(d.get("save_intermediates", False)),
             profile=bool(d.get("profile", False)),
         )
+
+    def __repr__(self) -> str:
+        return (
+            "RuntimeFlags("
+            f"log_level={self.log_level.name}, "
+            f"dry_run={self.dry_run}, "
+            f"strict={self.strict}, "
+            f"save_intermediates={self.save_intermediates}, "
+            f"profile={self.profile}"
+            ")"
+        )

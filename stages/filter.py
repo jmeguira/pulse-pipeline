@@ -1,18 +1,19 @@
 from domain.clip import ClipState
 from domain.pipeline_context import PipelineContext
-from domain.stage import Stage
+from domain.stage import Stage, StageGroup
 
 
 class FilterStage(Stage):
 
     INPUT_CLIP_STATE = ClipState.ELIGIBLE
-    OUTPUT_CLIP_STATE: ClipState.REJECTED
+    OUTPUT_CLIP_STATE = ClipState.REJECTED
+    STAGE_GROUP = StageGroup.DISCOVER
 
     @property
     def name(self) -> str:
         return "<FILTER>"
 
-    def should_run(self, ctx: PipelineContext) -> bool:
+    def is_stage_enabled(self, ctx: PipelineContext) -> bool:
         return True
 
     def run(self, ctx: PipelineContext) -> None:

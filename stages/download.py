@@ -6,18 +6,19 @@ from tqdm import tqdm
 
 from domain.clip import ClipState
 from domain.pipeline_context import PipelineContext
-from domain.stage import Stage
+from domain.stage import Stage, StageGroup
 
 
 class DownloadStage(Stage):
     INPUT_CLIP_STATE = ClipState.SELECTED
     OUTPUT_CLIP_STATE = ClipState.DOWNLOADED
+    STAGE_GROUP = StageGroup.ASSEMBLE
 
     @property
     def name(self):
         return "<DOWNLOAD>"
 
-    def should_run(self, ctx: PipelineContext) -> bool:
+    def is_stage_enabled(self, ctx: PipelineContext) -> bool:
         return True
 
     def run(self, ctx: PipelineContext):

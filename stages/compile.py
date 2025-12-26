@@ -14,19 +14,20 @@ from tqdm import tqdm
 
 from domain.clip import ClipState
 from domain.pipeline_context import PipelineContext
-from domain.stage import Stage
+from domain.stage import Stage, StageGroup
 from utils.compile_utils import get_outro_clip
 
 
 class CompileStage(Stage):
     INPUT_CLIP_STATE = ClipState.TRANSFORMED
     OUTPUT_CLIP_STATE = ClipState.COMPILED
+    STAGE_GROUP = StageGroup.ASSEMBLE
 
     @property
     def name(self):
         return "<COMPILE>"
 
-    def should_run(self, ctx: PipelineContext) -> bool:
+    def is_stage_enabled(self, ctx: PipelineContext) -> bool:
         if (
             ctx.clip.count_clips_in_state(ClipState.ELIGIBLE)
             >= ctx.run_config.TARGET_COUNT
