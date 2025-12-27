@@ -4,6 +4,14 @@ from typing import Any, Mapping
 from domain.log_level import LogLevel
 
 
+def parse_log_level(value: str) -> LogLevel:
+    try:
+        return LogLevel[value.upper()]
+    except KeyError:
+        valid = ", ".join(level.name.lower() for level in LogLevel)
+        raise ValueError(f"Invalid log level: {value}. Expected one of: {valid}")
+
+
 @dataclass(frozen=True)
 class RuntimeFlags:
     log_level: LogLevel = LogLevel.NORMAL
@@ -15,7 +23,7 @@ class RuntimeFlags:
     @staticmethod
     def from_mapping(d: Mapping[str, Any]) -> "RuntimeFlags":
         return RuntimeFlags(
-            log_level=LogLevel(d.get("log_level", LogLevel.NORMAL)),
+            log_level=parse_log_level(d.get("log_level", "normal")),
             dry_run=bool(d.get("dry_run", False)),
             strict=bool(d.get("strict", False)),
             save_intermediates=bool(d.get("save_intermediates", False)),

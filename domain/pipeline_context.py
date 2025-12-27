@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List
 
 from domain.clip import Clip, ClipState
+from domain.log_level import LogLevel
 from domain.run_config import RunConfig
 from domain.runtime_flags import RuntimeFlags
 from utils.flag_utils import load_flags
@@ -94,3 +95,18 @@ class PipelineContext:
                 "-" * 48,
             ]
         )
+
+    def log(self, level: LogLevel, msg: str, **fields) -> None:
+        if level > self.flags.log_level:
+            return
+
+        print(f"[{level.name}] {msg}")
+
+    def debug(self, msg: str, **fields) -> None:
+        self.log(LogLevel.DEBUG, msg, **fields)
+
+    def error(self, msg: str, **fields) -> None:
+        self.log(LogLevel.NORMAL, msg, **fields)
+
+    def trace(self, msg: str, **fields) -> None:
+        self.log(LogLevel.TRACE, msg, **fields)

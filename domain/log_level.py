@@ -1,8 +1,8 @@
-from enum import Enum
+from enum import IntEnum
 
 
-class LogLevel(str, Enum):
-    QUIET = "quiet"
-    NORMAL = "normal"
-    DEBUG = "debug"
-    TRACE = "trace"
+class LogLevel(IntEnum):
+    QUIET = 0
+    NORMAL = 1
+    DEBUG = 2
+    TRACE = 3
