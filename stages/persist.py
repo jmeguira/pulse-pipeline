@@ -41,4 +41,4 @@ class PersistStage(Stage):
         with open(os.path.join(output_path, "description.txt"), "w", encoding="utf-8") as f:
             f.write(description)
 
-        print(f"✅ Title & description saved in: {output_path}")
+        ctx.debug(f"✅ Title & description saved in: {output_path}")

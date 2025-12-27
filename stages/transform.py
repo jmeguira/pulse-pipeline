@@ -26,7 +26,7 @@ class TransformStage(Stage):
     def run(self, ctx: PipelineContext) -> None:
         for idx, clip in enumerate(
             tqdm(
-                ctx.clip.clips,
+                ctx.clip.clips_in_state(state=ClipState.DOWNLOADED),
                 desc="Pre-processing clips",
             )
         ):
@@ -41,8 +41,7 @@ class TransformStage(Stage):
                     try:
                         normalize_clip_audio(ctx.run_config, clip.raw_path)
                     except Exception as e:
-                        print(f"⚠ Failed to normalize {str(clip)}\n\nError: {str(e)}")
-
+                        ctx.trace(f"⚠ Failed to normalize {str(clip)}\n\nError: {str(e)}")
                         continue
 
                 with VideoFileClip(clip.raw_path).resized(

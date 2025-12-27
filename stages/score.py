@@ -10,7 +10,6 @@ class ScoreStage(Stage):
 
     @property
     def name(self) -> str:
-        """Score Stage"""
         return "<SCORE>"
 
     def is_stage_enabled(self, ctx: PipelineContext) -> bool:

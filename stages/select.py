@@ -24,7 +24,7 @@ def write_clips_json(ctx: PipelineContext, state: ClipState = None) -> None:
         with out_path.open("w", encoding="utf-8") as f:
             json.dump(payload, f, indent=4)
     except Exception as e:
-        print(f"Failed to write clips.json to {out_path}. Error: {e}")
+        ctx.error(f"Failed to write clips.json to {out_path}. Error: {e}")
 
 
 class SelectStage(Stage):

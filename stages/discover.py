@@ -44,7 +44,7 @@ class DiscoverStage(Stage):
             tzinfo=timezone.utc,
         ).isoformat()
 
-        print(
+        ctx.debug(
             f"Fetching Shorts for '{keyword}' | target_count: '{target_count}' | candidate_goal: '{candidate_goal}'"
         )
 
@@ -52,7 +52,7 @@ class DiscoverStage(Stage):
 
         youtube = build("youtube", "v3", developerKey=ctx.run_config.YOUTUBE_API_KEY)
 
-        print(
+        ctx.trace(
             f"  ➤ Page {ctx.acquire.pages_processed}/{max_pages} | candidates: {len(candidate_pool)}/{candidate_goal} |"
             f" target_count={target_count}"
         )
@@ -143,7 +143,7 @@ class DiscoverStage(Stage):
                 )
             )
             if len(candidate_pool) >= candidate_goal:
-                print(
+                ctx.debug(
                     f"Candidate goal reached: {len(candidate_pool)}/{candidate_goal} "
                     f"(target_count={target_count}, oversample={ctx.run_config.OVERSAMPLE})"
                 )

@@ -7,7 +7,7 @@ class CleanStage(Stage):
 
     @property
     def name(self):
-        return "Clean artifacts. Metadata consolidation. Run logging."
+        return "<CLEAN>"
 
     def is_stage_enabled(self, ctx: PipelineContext) -> bool:
         return True

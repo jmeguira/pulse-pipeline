@@ -72,13 +72,12 @@ class CompileStage(Stage):
             title_clip = title_clip.with_effects([vfx.Resize((output_width, output_height))])
             output_clips.append(title_clip)
         else:
-            print(f"⚠ No title card found at {title_card_path}")
+            ctx.error(f"⚠ No title card found at {title_card_path}")
             return
 
         num_clips = len(ctx.clip.clips)
         downloaded = ctx.clip.clips_in_state(ClipState.TRANSFORMED)
         for idx, clip in enumerate(tqdm(downloaded, "Compiling clips")):
-            print(clip)
             if not clip.is_stage_ready(self.INPUT_CLIP_STATE):
                 continue
             try:
