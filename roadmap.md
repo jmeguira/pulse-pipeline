@@ -93,7 +93,7 @@
 * Acknowledged expanded lifecycle (not fully implemented; subject to merge/mutation):
 
     *
-    `DISCOVERED → FILTERED → CULLED → ELIGIBLE → SCORED → RANKED? → SELECTED → DOWNLOADED → TRANSFORMED → COMPILED → PERSISTED → CLEANED`
+  `DISCOVERED → FILTERED → CULLED → ELIGIBLE → SCORED → RANKED? → SELECTED → DOWNLOADED → TRANSFORMED → COMPILED → PERSISTED → CLEANED`
 
 **Outcome:** Working pipeline with explicit contracts and durable boundaries
 
@@ -145,37 +145,45 @@
 
 ---
 
-## Phase 2.5 — Hardening & Extensibility (🟡 Active)
+## Phase 2.5 — Hardening & Extensibility (🟢 Complete)
 
 **Goal:** Stabilize control surfaces before expanding capability
 
 * Flags-first execution model:
-
     * Centralized `flags.json` → `RuntimeFlags` → `ctx.flags`
-    * Flags as the primary lens for behavior changes
+    * Flags as the primary lens for execution behavior
+    * `strict` explicitly scoped to **per-clip failure policy**
 
-* Logging infrastructure (in progress):
-
+* Logging infrastructure:
     * Log levels: `QUIET / NORMAL / DEBUG / TRACE`
-    * `ctx.log`, `ctx.debug`, `ctx.error`, `ctx.trace`
-    * Stage-level logging via DEBUG; clip-level via TRACE
+    * Unified logging surface (`ctx.log`, `ctx.debug`, `ctx.error`, `ctx.trace`)
+    * Readable, aligned output with structured fields
+    * Run header / footer emitted outside pipeline
+    * Stage start / end logging at DEBUG
 
-* Exception handling standardization (in progress):
+* Timing & observability:
+    * Per-stage timing (seconds, `perf_counter`)
+    * Total run timing surfaced in footer
+    * No lifecycle counters; derived state computed just-in-time
 
-    * Stage wrapper with consistent try/except
-    * Per-clip wrapper for partial failure tolerance
-    * Single `strict` / `fail_fast` semantic
+* Exception handling standardization:
+    * Stage-level failures are **always run-fatal**
+    * Per-clip failures set status + reason
+    * Non-strict continues; strict fails fast
+    * Helpers remain unsafe; policy enforced at stage boundaries
 
 * Execution gating:
-
     * `dry_run` semantics locked (`DISCOVER` only)
-    * Future generalization via stage-group gating
+    * No further gating generalized yet (explicitly deferred)
 
-**Outcome (target):** Predictable behavior, legible runs, and safe iteration velocity
+**Outcome:**
+Stable infra with clear failure semantics, legible runs, clean stopping points, and low cognitive overhead for
+iteration.
+
 
 ---
 
-## Phase 3 — Selection & Pool Shaping (🟡 In Progress)
+## Phase 3 — Selection & Pool Shaping (🟢 Complete — MVP)
 
 **Goal:** Control volume and intent before execution
 
@@ -187,7 +195,8 @@
 
 * Download and downstream stages consume **only `SELECTED`**
 
-**Outcome:** Candidate inventory decoupled from execution volume
+**Outcome:** Candidate inventory decoupled from execution volume, with a clear execution boundary
+
 
 ---
 
@@ -253,11 +262,11 @@ This section intentionally aggregates:
 
 **Known risks / accepted debt:**
 
-* Exception handling semantics still stabilizing
 * Adaptive harvesting logic partial and stage-local
 * Selection heuristic intentionally naive
 * Determinism across reruns not guaranteed
-* Observability flags partially wired
+* `profile` and `save_intermediates` flags available but not activated
+* No orchestration re-entry from downstream when pool is thin.
 
 **Deferred future ideas / ops surface:**
 
