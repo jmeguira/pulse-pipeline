@@ -1,10 +1,12 @@
 import os
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 from config.keyword_config import KEYWORD_CONFIG
 from domain.clip import ClipState
+from domain.log_level import LogLevel
 from domain.pipeline_context import PipelineContext, AcquireContext, ClipContext
 from domain.run_config import RunConfig
 from domain.stage import StageGroup, Stage
@@ -134,6 +136,21 @@ def is_group_enabled(ctx: PipelineContext, stage: Stage, group: StageGroup) -> b
 
 
 def main_pipeline(ctx: PipelineContext) -> None:
+    ctx.log(
+        LogLevel.NORMAL,
+        "Run start",
+        **{
+            "keyword": ctx.run_config.KEYWORD,
+            "target": ctx.run_config.TARGET_COUNT,
+            "candidate_goal": ctx.run_config.CANDIDATE_GOAL,
+            "max_pages": ctx.run_config.MAX_PAGES,
+            "log_level": ctx.flags.log_level.name.lower(),
+            "dry_run": ctx.flags.dry_run,
+            "strict": ctx.flags.strict,
+        },
+    )
+    t_run_start = time.perf_counter()
+
     acquire_stages = [
         DiscoverStage(),
         FilterStage(),
@@ -153,22 +170,25 @@ def main_pipeline(ctx: PipelineContext) -> None:
 
     while True:
         for stage in acquire_stages:
-            ctx.debug(f"Starting stage: {stage.name}")
+            ctx.debug("Starting stage", stage=stage.name)
+            t0 = time.perf_counter()
             try:
                 stage.execute(ctx)
             except Exception as e:
-                ctx.error(f"Stage failed: {stage.name} ({type(e).__name__}: {e})")
+                ctx.error("Stage failed", stage=stage.name, err_type=type(e).__name__, err=e)
                 raise
+            dt_s = round(time.perf_counter() - t0, 3)
+            ctx.debug("Exiting stage", stage=stage.name, duration_s=dt_s)
 
         if ctx.clip.count_clips_in_state(ClipState.ELIGIBLE) >= ctx.run_config.CANDIDATE_GOAL:
-            print(
+            ctx.debug(
                 f"Candidate goal reached: {ctx.clip.eligible_count}/{ctx.run_config.CANDIDATE_GOAL} "
                 f"(target_count={ctx.run_config.TARGET_COUNT}, oversample={ctx.run_config.OVERSAMPLE})"
             )
             break
 
         if ctx.acquire.pages_processed >= ctx.run_config.MAX_PAGES:
-            print(
+            ctx.error(
                 f"Stopping discovery: hit MAX_PAGES={ctx.run_config.MAX_PAGES} with"
                 f" {ctx.clip.eligible_count}/{ctx.run_config.CANDIDATE_GOAL} candidates."
                 f" Likely: narrow date window, strict gate, or low-signal keyword."
@@ -176,7 +196,7 @@ def main_pipeline(ctx: PipelineContext) -> None:
             break
 
         if not ctx.acquire.cursor:
-            print(
+            ctx.error(
                 f"End of search results (no nextPageToken) at page {ctx.acquire.pages_processed}. "
                 f"Collected {ctx.clip.eligible_count}/{ctx.run_config.CANDIDATE_GOAL} candidates."
             )
@@ -185,21 +205,31 @@ def main_pipeline(ctx: PipelineContext) -> None:
     for stage in assemble_stages:
         if ctx.flags.dry_run:
             if not is_group_enabled(ctx, stage, StageGroup.DISCOVER):
-                print(f"Skipping stage: {stage.name}")
+                ctx.debug("Skipping stage", stage=stage.name)
                 continue
 
-        ctx.debug(f"Starting stage: {stage.name}")
+        ctx.debug("Starting stage", stage=stage.name)
+        t0 = time.perf_counter()
         try:
             stage.execute(ctx)
         except Exception as e:
-            ctx.error(f"Stage failed: {stage.name} ({type(e).__name__}: {e})")
+            ctx.error("Stage failed", stage=stage.name, err_type=type(e).__name__, err=e)
             raise
+        dt_s = round(time.perf_counter() - t0, 3)
+        ctx.debug("Exiting stage", stage=stage.name, duration_s=dt_s)
+
+    total_s = round(time.perf_counter() - t_run_start, 3)
+    context.log(
+        LogLevel.NORMAL,
+        "Run complete",
+        duration_s=total_s,
+        pool=f"[ {context.clip.count_clips_by_state()} ]",
+    )
 
 
 if __name__ == "__main__":
     run_config = build_run_config(list(KEYWORD_CONFIG.keys()))
     flags = load_flags(Path("flags.json"))
-    print(flags)
     context = PipelineContext(
         run_config=run_config, acquire=AcquireContext(), clip=ClipContext(), flags=flags
     )

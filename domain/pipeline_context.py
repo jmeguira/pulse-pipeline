@@ -41,15 +41,7 @@ class ClipContext:
 
     def count_clips_by_state(self, compact: bool = True) -> str:
         state_counts = Counter(clip.state for clip in self.clips)
-
-        if compact:
-            parts = " ".join(f"{state.name}={count}" for state, count in state_counts.items())
-            return f"[CANDIDATE POOL] {parts}"
-
-        rtn = "[CANDIDATE POOL]"
-        for state, count in state_counts.items():
-            rtn += f"  {state.name}: {count}"
-        return rtn
+        return " | ".join(f"{state.name}={count}" for state, count in state_counts.items())
 
 
 @dataclass
@@ -58,6 +50,7 @@ class PipelineContext:
     acquire: AcquireContext
     clip: ClipContext
     flags: RuntimeFlags
+    LOG_PREFIX_WIDTH = 8
 
     def __init__(
         self, run_config: RunConfig, acquire: AcquireContext, clip: ClipContext, flags: RuntimeFlags
@@ -100,7 +93,14 @@ class PipelineContext:
         if level > self.flags.log_level:
             return
 
-        print(f"[{level.name}] {msg}")
+        prefix = f"[{level.name}]".ljust(self.LOG_PREFIX_WIDTH)
+
+        if fields:
+            field_str = " | " + " | ".join(f"{k}={v}" for k, v in fields.items())
+        else:
+            field_str = ""
+
+        print(f"{prefix} {msg}{field_str}")
 
     def debug(self, msg: str, **fields) -> None:
         self.log(LogLevel.DEBUG, msg, **fields)

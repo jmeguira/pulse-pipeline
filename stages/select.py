@@ -30,6 +30,7 @@ class SelectStage(Stage):
     OUTPUT_CLIP_STATE = ClipState.SELECTED
     STAGE_GROUP = StageGroup.DISCOVER
 
+    @property
     def name(self) -> str:
         return "<SELECT>"
 

@@ -52,8 +52,4 @@ class Stage(ABC):
     def execute(self, ctx: PipelineContext) -> None:
         """Run the stage if should_run() is True."""
         if self.is_stage_enabled(ctx):
-            print(f"▶ Running stage: {self.name}")
             self.run(ctx)
-            print(ctx)
-        else:
-            print(f"⏭ Skipping stage: {self.name}")
