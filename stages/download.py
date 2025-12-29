@@ -25,12 +25,12 @@ class DownloadStage(Stage):
         keyword = ctx.run_config.KEYWORD
         output_path = ctx.run_config.OUTPUT_FULL_PATH
         os.makedirs(output_path, exist_ok=True)
-        YDL_OPTS = {
+        ydl_opts = {
             **ctx.run_config.YDL_OPTS,
             "outtmpl": os.path.join(output_path, "%(id)s.%(ext)s"),
         }
 
-        with yt_dlp.YoutubeDL(YDL_OPTS) as ydl:
+        with (yt_dlp.YoutubeDL(ydl_opts) as ydl):
             for clip in tqdm(
                 ctx.clip.clips_in_state(ClipState.SELECTED),
                 desc=f"Downloading {ctx.run_config.TARGET_COUNT} videos for '{keyword}'",
@@ -42,7 +42,11 @@ class DownloadStage(Stage):
                     ydl.download(clip.metadata.url)
                 except Exception as e:
                     clip.set_state(ClipState.FAILED)
-                    clip.failure_reason = f"Failed to download {str(clip)}\n\nError: {str(e)}"
+                    clip.failure_reason = f"{type(e).__name__}: {e}"
+                    ctx.error(f"Failed to download clip: {str(clip.id[:8])}")
+                    if ctx.flags.strict:
+                        ctx.error(f"{type(e).__name__}: {e}")
+                        raise
                     continue
 
                 clip.set_state(ClipState.DOWNLOADED)

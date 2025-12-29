@@ -20,11 +20,8 @@ def write_clips_json(ctx: PipelineContext, state: ClipState = None) -> None:
     out_path = Path(ctx.run_config.OUTPUT_FULL_PATH) / "clips.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    try:
-        with out_path.open("w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=4)
-    except Exception as e:
-        ctx.error(f"Failed to write clips.json to {out_path}. Error: {e}")
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=4)
 
 
 class SelectStage(Stage):
@@ -49,4 +46,8 @@ class SelectStage(Stage):
         for clip in eligible[:ctx.run_config.TARGET_COUNT]:
             clip.state = ClipState.SELECTED
 
-        write_clips_json(ctx, ClipState.SELECTED)
+        try:
+            write_clips_json(ctx, ClipState.SELECTED)
+        except Exception as e:
+            ctx.error(f"Failed to write clips.json file. Error: {e}")
+            raise

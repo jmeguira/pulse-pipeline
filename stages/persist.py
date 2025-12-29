@@ -35,10 +35,15 @@ class PersistStage(Stage):
         )
 
         # Write to files in the same folder as the compilation video
-        with open(os.path.join(output_path, "title.txt"), "w", encoding="utf-8") as f:
-            f.write(title)
+        try:
+            with open(os.path.join(output_path, "title.txt"), "w", encoding="utf-8") as f:
+                f.write(title)
+        except Exception as e:
+            ctx.error(f"Failed to write title.txt file. Error: {e}")
+            raise
 
         with open(os.path.join(output_path, "description.txt"), "w", encoding="utf-8") as f:
+            ctx.error("Failed to write description.txt file. Error: {e}")
             f.write(description)
 
-        ctx.debug(f"✅ Title & description saved in: {output_path}")
+        ctx.debug(f"Title & description saved in: {output_path}")

@@ -75,12 +75,14 @@ class DiscoverStage(Stage):
                 )
                 .execute()
             )
+
         except Exception as e:
-            raise Exception(f"Error: YouTube search failed on page {ctx.acquire.pages_processed + 1} (token={ctx.acquire.cursor}): {e}")
+            ctx.error(f"Error: YouTube search failed on page {ctx.acquire.pages_processed + 1}"
+                      f" (token={ctx.acquire.cursor}): {e}")
+            raise
 
         ctx.acquire.pages_processed += 1
         ctx.acquire.cursor = search_resp.get("nextPageToken")
-
         video_ids = []
         for item in search_resp.get("items", []):
             video_id = item.get("id", {}).get("videoId")
@@ -90,10 +92,11 @@ class DiscoverStage(Stage):
         video_ids = video_ids[:50]
 
         if not video_ids:
-            raise Exception(
+            ctx.debug(
                 f"Error: No results returned on page {ctx.acquire.pages_processed} (token={ctx.acquire.cursor}). "
                 f"Stopping with {len(candidate_pool)}/{candidate_goal} candidates."
             )
+            return
 
         try:
             videos_resp = (
@@ -105,7 +108,8 @@ class DiscoverStage(Stage):
                 .execute()
             )
         except Exception as e:
-            raise Exception(f"Error: videos.list failed for {len(video_ids)} ids on page {ctx.acquire.pages_processed}: {e}")
+            ctx.error(f"Error: videos.list failed for {len(video_ids)} ids on page {ctx.acquire.pages_processed}: {e}")
+            raise
 
         for video in videos_resp.get("items", []):
             id = video["id"]

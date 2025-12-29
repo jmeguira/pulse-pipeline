@@ -52,9 +52,7 @@ class CompileStage(Stage):
         ctx.clip.clips_in_state(ClipState.DOWNLOADED).sort(key=lambda v: v.metadata.view_count)
 
         if not Path(transition_sound_path).exists():
-            raise Exception(
-                f"⚠ No transition audio found at  at {ctx.run_config.TRANSITION_SOUND_PATH}"
-            )
+            raise RuntimeError(f"No transition audio found at  at {ctx.run_config.TRANSITION_SOUND_PATH}")
 
         transition_sound_clip = AudioFileClip(transition_sound_path).subclipped(
             0, transition_duration
@@ -67,13 +65,12 @@ class CompileStage(Stage):
 
         output_clips = []
         # --- Title Card ---
-        if os.path.exists(title_card_path):
-            title_clip = VideoFileClip(title_card_path)
-            title_clip = title_clip.with_effects([vfx.Resize((output_width, output_height))])
-            output_clips.append(title_clip)
-        else:
-            ctx.error(f"⚠ No title card found at {title_card_path}")
-            return
+        if not os.path.exists(title_card_path):
+            raise RuntimeError(f"No title card found at {title_card_path}")
+
+        title_clip = VideoFileClip(title_card_path)
+        title_clip = title_clip.with_effects([vfx.Resize((output_width, output_height))])
+        output_clips.append(title_clip)
 
         num_clips = len(ctx.clip.clips)
         downloaded = ctx.clip.clips_in_state(ClipState.TRANSFORMED)
@@ -103,7 +100,13 @@ class CompileStage(Stage):
                 clip.state = self.OUTPUT_CLIP_STATE
 
             except Exception as e:
-                print(f"⚠ Failed to compile {str(clip)}: error{str(e)}")
+                clip.set_state(ClipState.FAILED)
+                clip.failure_reason = f"{type(e).__name__}: {e}"
+                ctx.error(f"Failed to compile clip: {str(clip.id[:8])}")
+                if ctx.flags.strict:
+                    ctx.error(f"{type(e).__name__}: {e}")
+                    raise
+                continue
 
         output_clips.append(get_outro_clip())
         title_clip = VideoFileClip(title_card_path)

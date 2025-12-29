@@ -153,7 +153,12 @@ def main_pipeline(ctx: PipelineContext) -> None:
 
     while True:
         for stage in acquire_stages:
-            stage.execute(ctx)
+            ctx.debug(f"Starting stage: {stage.name}")
+            try:
+                stage.execute(ctx)
+            except Exception as e:
+                ctx.error(f"Stage failed: {stage.name} ({type(e).__name__}: {e})")
+                raise
 
         if ctx.clip.count_clips_in_state(ClipState.ELIGIBLE) >= ctx.run_config.CANDIDATE_GOAL:
             print(
@@ -180,9 +185,15 @@ def main_pipeline(ctx: PipelineContext) -> None:
     for stage in assemble_stages:
         if ctx.flags.dry_run:
             if not is_group_enabled(ctx, stage, StageGroup.DISCOVER):
-                print(f"⏭ Skipping stage: {stage.name}")
+                print(f"Skipping stage: {stage.name}")
                 continue
-        stage.execute(ctx)
+
+        ctx.debug(f"Starting stage: {stage.name}")
+        try:
+            stage.execute(ctx)
+        except Exception as e:
+            ctx.error(f"Stage failed: {stage.name} ({type(e).__name__}: {e})")
+            raise
 
 
 if __name__ == "__main__":
