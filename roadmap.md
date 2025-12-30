@@ -1,4 +1,4 @@
-# Product Roadmap — Pulse
+# Product Roadmap — Pulse (Updated)
 
 ---
 
@@ -6,49 +6,44 @@
 
 **What Pulse is**
 
-* A system that **samples what’s resonating now** within a topic and renders it as video.
-
-* Not predictive. Not exhaustive. **Observational and lightweight** by design.
+- A system that **samples what’s resonating within a defined time window** for a topic and renders it as video.
+- **Observational, time-bounded, and lightweight** by design.
+- Built to explore **theme × time slices**, not to declare importance or predict outcomes.
 
 **What matters right now**
 
-* Maintain a **wide top-of-funnel** and learn from real outputs.
-
-* Optimize for **signal discovery**, not framework completeness.
-
-* Bias toward **shipping artifacts** over architectural elegance.
+- Maintain a **wide top-of-funnel** while cheaply testing acquisition quality.
+- Optimize for **shipping real artifacts** and observing feedback.
+- Bias toward **subtraction and legibility** over feature growth.
+- Treat the system explicitly as an **experiment**, not a production commitment.
 
 **What Pulse is not (yet)**
 
-* Not a generalized engine for scale.
-
-* Not a precision relevance model.
-
-* Not an editorially perfected product.
+- Not a generalized or scalable engine.
+- Not a recommendation or relevance model.
+- Not an editorial or personality-driven product.
+- Not an automated publishing machine.
 
 **Operating principles**
 
-* One run produces one video.
-
-* Prefer derived state over duplicated counters.
-
-* Expand scope **only at points of friction**.
-
-* Treat search as a hinting system; shape downstream.
-
-* Preserve readability to reduce cognitive load.
+- One run → one artifact.
+- Prefer **derived state** over persistent counters.
+- Expand scope **only at points of observed friction**.
+- Treat search and acquisition as **hinting systems**, not ground truth.
+- Preserve legibility to minimize cognitive and operational load.
+- Favor **clean exits and explicit stopping points**.
 
 ---
 
 ## Status Summary (Current)
 
-* Pipeline **runs end-to-end and produces final artifacts**
-
-* Clip lifecycle fully formalized through persistence
-
-* Multiple validated full runs after orchestration + discovery refactor
-
-* Current focus: **acquisition quality, selection boundaries, and observability**, not core viability
+- Pipeline runs **end-to-end** and produces inspectable artifacts.
+- DISCOVER loop is fast, configurable, and human-inspectable.
+- Execution volume is controlled via an explicit `SELECTED` boundary.
+- Infra, logging, flags, and failure semantics are stable.
+- Current active work:
+    - **Acquisition tightening**
+    - **Editing subtraction / simplification**
 
 ---
 
@@ -56,92 +51,42 @@
 
 **Goal:** Prove end-to-end feasibility
 
-* Single-script MVP:
+- Query YouTube
+- Download clips
+- Compile video
+- Upload manually
 
-    * Query YouTube
-
-    * Download clips
-
-    * Compile video
-
-    * Upload successfully
-
-* Manual configuration
-
-* Multiple successful uploads
-
-**Outcome:** System viability confirmed
+**Outcome:** System viability confirmed.
 
 ---
 
 ## Phase 1 — Pipeline Formalization (✅ Complete)
 
-**Goal:** Turn MVP into a maintainable pipeline
+**Goal:** Create durable structure without over-engineering
 
-* Stage-based pipeline introduced
+- Stage-based pipeline
+- Explicit orchestrator
+- Acquire → Assemble flow
+- Clip lifecycle implemented (MVP)
+- Contracts acknowledged for future expansion
 
-* Context-driven execution
-
-* Explicit orchestrator
-
-* Acquire → Assemble flow
-
-* Clip lifecycle states implemented to date:
-
-    * `DISCOVERED → ELIGIBLE → SELECTED → DOWNLOADED → TRANSFORMED → COMPILED`
-
-* Acknowledged expanded lifecycle (not fully implemented; subject to merge/mutation):
-
-    *
-  `DISCOVERED → FILTERED → CULLED → ELIGIBLE → SCORED → RANKED? → SELECTED → DOWNLOADED → TRANSFORMED → COMPILED → PERSISTED → CLEANED`
-
-**Outcome:** Working pipeline with explicit contracts and durable boundaries
+**Outcome:** Maintainable, legible pipeline.
 
 ---
 
 ## Phase 2 — Acquisition Tightening (🟢 Complete)
 
-**Goal:** Improve top-of-funnel signal quality without narrowing too early
+**Goal:** Improve top-of-funnel signal quality without narrowing prematurely
 
-* Introduced **stage groups** as hard invariants:
+- Stage groups enforced: `DISCOVER / ASSEMBLE / PERSIST`
+- Date-bounded popularity sampling
+- Shorts bias and configurable ordering
+- Language & region bias
+- `keyword_config` as primary acquisition surface
+- Explicit acquisition state tracking
+- `clips.json` artifact for human inspection
 
-    * `DISCOVER / ASSEMBLE / PERSIST`
-    * Groups represent **cost domains**, not descriptions
-    * Enforced at class-definition time
-
-* Refined DISCOVER loop:
-
-    * Date-bounded popularity sampling
-    * Shorts bias (`videoDuration="short"`)
-    * Configurable ordering (`viewCount` vs `relevance`)
-    * Language & region bias
-
-* Implemented **Acquire / Discover loop**:
-
-    * DISCOVER stages run until pool is “full”
-    * Pool pruned to evaluation-eligible
-    * Explicit awareness of DISCOVER → ASSEMBLE handoff (scoring/ranking treated as tech debt)
-
-* `keyword_config` in continuous use since initial pipeline refactor:
-
-    * Include / exclude terms
-    * Composable query builder
-    * Serves as the primary acquisition-shaping surface
-
-* Clarified acquisition state:
-
-    * `cursor`
-    * `pages_processed`
-    * `discovered`, `rejected`, `culled`
-
-* Implemented **`clips.json`** artifact:
-
-    * Written once at DISCOVER loop exit
-    * Idempotent, overwritten each run
-    * Explicit serialization (`to_dict`, not `__repr__`)
-    * Human-inspectable (clickable links) for rapid judgment
-
-**Outcome:** DISCOVER is fast, inspectable, and human-in-the-loop by default
+**Outcome:** DISCOVER is fast, inspectable, and human-in-the-loop.
 
 ---
 
@@ -149,128 +94,123 @@
 
 **Goal:** Stabilize control surfaces before expanding capability
 
-* Flags-first execution model:
-    * Centralized `flags.json` → `RuntimeFlags` → `ctx.flags`
-    * Flags as the primary lens for execution behavior
-    * `strict` explicitly scoped to **per-clip failure policy**
+- Flags-first execution model
+- Unified logging with levels
+- Per-stage and total timing
+- Standardized exception handling
+- Clear execution gating (`dry_run` limited to DISCOVER)
 
-* Logging infrastructure:
-    * Log levels: `QUIET / NORMAL / DEBUG / TRACE`
-    * Unified logging surface (`ctx.log`, `ctx.debug`, `ctx.error`, `ctx.trace`)
-    * Readable, aligned output with structured fields
-    * Run header / footer emitted outside pipeline
-    * Stage start / end logging at DEBUG
-
-* Timing & observability:
-    * Per-stage timing (seconds, `perf_counter`)
-    * Total run timing surfaced in footer
-    * No lifecycle counters; derived state computed just-in-time
-
-* Exception handling standardization:
-    * Stage-level failures are **always run-fatal**
-    * Per-clip failures set status + reason
-    * Non-strict continues; strict fails fast
-    * Helpers remain unsafe; policy enforced at stage boundaries
-
-* Execution gating:
-    * `dry_run` semantics locked (`DISCOVER` only)
-    * No further gating generalized yet (explicitly deferred)
-
-**Outcome:**
-Stable infra with clear failure semantics, legible runs, clean stopping points, and low cognitive overhead for
-iteration.
-
+**Outcome:** Stable infra with clean failure semantics and low cognitive overhead.
 
 ---
 
 ## Phase 3 — Selection & Pool Shaping (🟢 Complete — MVP)
 
-**Goal:** Control volume and intent before execution
+**Goal:** Control execution volume independently of discovery volume
 
-* Introduced `SELECTED` as a hard execution boundary
+- Introduced `SELECTED` as a hard execution boundary
+- Acquire fills to **candidate goal**
+- Select trims to **exact execution target** (temporary heuristic)
+- Downstream stages consume only `SELECTED`
 
-* Acquire fills to **candidate goal**, not target count
-
-* Select trims to **exact target count** (temporary heuristic: view count)
-
-* Download and downstream stages consume **only `SELECTED`**
-
-**Outcome:** Candidate inventory decoupled from execution volume, with a clear execution boundary
-
+**Outcome:** Execution volume decoupled from discovery.
 
 ---
 
-## Phase 4 — Signal Shaping & Scoring (🔜 Next)
+## Phase 4 — Signal Shaping & Acquisition Refinement (🟢 In Progress)
 
-**Goal:** Reduce junk, improve consistency
+**Goal:** Reduce junk and repetition before execution
 
-* Implement Filter stage (cheap hard rejects)
+**Active work**
 
-* Implement Cull stage (run-scoped dedup)
+- Implement **FILTER** stage (cheap hard rejects)
+- Implement **CULL** stage (run-scoped dedup)
+- Minimal reason codes for rejection
+- Cleaner, more legible pools entering selection
 
-* Minimal reason codes for rejection
+**Notes**
 
-* Persist `clips.json` / run artifacts for inspection
-
-**Outcome:** Cleaner, more explainable pool entering selection
+- No scoring or ranking yet
+- No persistence beyond run artifacts
+- Focus is clarity, not correctness
 
 ---
 
-## Phase 5 — Selection Quality Improvements (🔜 Later)
+## Phase 5 — Compilation Simplification (🟢 In Progress)
+
+**Goal:** Remove value-negative editing work
+
+**Authoritative editing baseline**
+
+**Keep**
+
+- Minimal logo watermark (small, static)
+- Creator attribution (format TBD)
+
+**Remove**
+
+- Thumbnail generation
+- Title cards
+- Transitions
+- Countdowns
+- Outros / end slates
+
+**Outcome:** Compilation acts as a neutral container, not a performance.
+
+---
+
+## Phase 6 — Selection Quality Improvements (🔜 Later)
 
 **Goal:** Pick better clips, not more clips
 
-* Lightweight scoring (views/day, engagement ratios)
+- Lightweight scoring (views/day, engagement ratios)
+- Simple diversity constraints
+- Keyword-specific tuning
 
-* Simple diversity constraints
+**Prerequisites**
 
-* Keyword-specific tuning
-
-**Outcome:** Higher-quality compilations with minimal added complexity
-
----
-
-## Phase 6 — Editorial & UX Polish (🟡 Required if Shipping)
-
-**Goal:** Improve viewer experience
-
-* Title / description generation
-
-* Transitions and pacing polish
-
-* Intro / outro standardization
-
-* Thematic consistency per keyword
+- Phase 4 + Phase 5 complete
+- Observed friction justifies complexity
 
 ---
 
-## ⚠️ Deferred, Non-Goals, and Open Design Space
+## ⚠️ Parked / Deferred Work (Explicit)
 
-This section intentionally aggregates:
+These are intentionally parked, not abandoned:
 
-* explicit non-goals (for now)
-* known risks and accepted debt
-* future ideas that do not yet justify a phase
+- Duration-based targeting (≈15–20 minutes)
+- Niche discovery and demand analysis
+- Top-down trend tooling
+- Publishing automation
+- Thumbnail / title optimization
+- Persistent DB-backed history
+- ML-based relevance models
+- GUI tooling
 
-**Explicit non-goals (current):**
+---
 
-* Large-scale engine optimization
-* Persistent DB-backed history
-* Full idempotency across reruns
-* ML-based relevance models
-* GUI tooling
+## Known Risks / Accepted Debt
 
-**Known risks / accepted debt:**
+- Adaptive harvesting logic partial and stage-local
+- Selection heuristic intentionally naive
+- Determinism across reruns not guaranteed
+- `profile` and `save_intermediates` flags available but not activated
+- No orchestration re-entry from downstream when pool is thin
 
-* Adaptive harvesting logic partial and stage-local
-* Selection heuristic intentionally naive
-* Determinism across reruns not guaranteed
-* `profile` and `save_intermediates` flags available but not activated
-* No orchestration re-entry from downstream when pool is thin.
+---
 
-**Deferred future ideas / ops surface:**
+## Deferred Future Ideas / Ops Surface
 
-* CLI overrides for flags and high-level run intent
-* Config layering cleanup (`.env` for secrets / machine state, JSON for run intent)
-* Resolved-run snapshot for reproducibility
-* Stage-group gating generalization beyond `dry_run`
+- CLI overrides for flags and high-level run intent
+- Config layering cleanup (`.env` for secrets / machine state, JSON for run intent)
+- Resolved-run snapshot for reproducibility
+- Stage-group gating generalization beyond `dry_run`
+
+---
+
+## Current Priority Window (Canonical)
+
+1. Phase 4 — FILTER + CULL
+2. Phase 5 — Editing subtraction
+3. Ship artifacts, observe friction
+4. Re-evaluate next expansion point
