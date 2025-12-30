@@ -1,5 +1,6 @@
 import os
 import time
+from collections import Counter
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -29,12 +30,17 @@ from utils.utils import (
 
 load_dotenv()
 
-# --- Fetch/Discover
+# --- Acquisition Loop
 MAX_PAGES = int(os.getenv("MAX_PAGES", 100))
 OVERSAMPLE = int(os.getenv("OVERSAMPLE", 10))
+# --- Discover
 ORDER = os.getenv("ORDER", "relevance")
 RELEVANCE_LANGUAGE = os.getenv("RELEVANCE_LANGUAGE", "en")
 REGION_CODE = os.getenv("REGION_CODE", "us")
+# --- Filter
+DURATION_MIN = int(os.getenv("DURATION_MIN", 7))
+DURATION_MAX = int(os.getenv("DURATION_MAX", 60))
+FILTER_LICENSED_CONTENT = os.getenv("FILTER_LICENSED_CONTENT", "false").lower() == "true"
 
 # --- Download
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
@@ -106,12 +112,15 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
         PUBLISHED_BEFORE=end_date,
         BATCH_SIZE=50,
         MAX_PAGES=MAX_PAGES,
-        ORDER=ORDER,
         OVERSAMPLE=OVERSAMPLE,
+        CANDIDATE_GOAL=target_count * OVERSAMPLE,
+        ORDER=ORDER,
         RELEVANCE_LANGUAGE=RELEVANCE_LANGUAGE,
         REGION_CODE=REGION_CODE,
-        CANDIDATE_GOAL=target_count * OVERSAMPLE,
         YOUTUBE_API_KEY=YOUTUBE_API_KEY,
+        DURATION_MIN=DURATION_MIN,
+        DURATION_MAX=DURATION_MAX,
+        FILTER_LICENSED_CONTENT=FILTER_LICENSED_CONTENT,
         YDL_OPTS=YDL_OPTS_BASE,
         ENABLE_LUFS=ENABLE_LUFS,
         TARGET_LUFS=TARGET_LUFS,
@@ -224,6 +233,24 @@ def main_pipeline(ctx: PipelineContext) -> None:
         "Run complete",
         duration_s=total_s,
         pool=f"[ {context.clip.count_clips_by_state()} ]",
+    )
+    context.log(
+        LogLevel.DEBUG,
+        (
+            " | ".join(
+                f"{state.value}: "
+                + ", ".join(
+                    f"{reason}={count}"
+                    for reason, count in Counter(
+                        (clip.status_reason or "unknown")
+                        for clip in ctx.clip.clips
+                        if clip.state == state
+                    ).items()
+                )
+                for state in (ClipState.FILTERED, ClipState.CULLED, ClipState.FAILED)
+                if any(clip.state == state for clip in ctx.clip.clips)
+            )
+        ),
     )
 
 

@@ -14,15 +14,20 @@ class RunConfig:
     ENABLE_LUFS: bool
     TARGET_LUFS: float
     # --- Acquisition Loop --- #
-    BATCH_SIZE: int
-    MAX_PAGES: int
-    ORDER: str
     OVERSAMPLE: int
-    RELEVANCE_LANGUAGE: str
-    REGION_CODE: str
     CANDIDATE_GOAL: int
     YOUTUBE_API_KEY: str
     YDL_OPTS: dict
+    # --- Discover --- #
+    BATCH_SIZE: int
+    MAX_PAGES: int
+    ORDER: str
+    RELEVANCE_LANGUAGE: str
+    REGION_CODE: str
+    # --- Filter --- #
+    DURATION_MIN: int
+    DURATION_MAX: int
+    FILTER_LICENSED_CONTENT: bool
     # --- Compilation / Output --- #
     OUTPUT_WIDTH: int
     OUTPUT_HEIGHT: int

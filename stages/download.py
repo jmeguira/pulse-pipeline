@@ -42,7 +42,7 @@ class DownloadStage(Stage):
                     ydl.download(clip.metadata.url)
                 except Exception as e:
                     clip.set_state(ClipState.FAILED)
-                    clip.failure_reason = f"{type(e).__name__}: {e}"
+                    clip.status_reason = f"{type(e).__name__}: {e}"
                     ctx.error(f"Failed to download clip: {str(clip.id[:8])}")
                     if ctx.flags.strict:
                         ctx.error(f"{type(e).__name__}: {e}")

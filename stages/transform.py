@@ -42,7 +42,7 @@ class TransformStage(Stage):
                     normalize_clip_audio(ctx.run_config, clip.raw_path)
                 except Exception as e:
                     clip.set_state(ClipState.FAILED)
-                    clip.failure_reason = f"{type(e).__name__}: {e}"
+                    clip.status_reason = f"{type(e).__name__}: {e}"
                     ctx.error(f"Failed to normalize clip audio: {str(clip.id[:8])}")
                     if ctx.flags.strict:
                         ctx.error(f"{type(e).__name__}: {e}")
@@ -70,7 +70,7 @@ class TransformStage(Stage):
 
             except Exception as e:
                 clip.set_state(ClipState.FAILED)
-                clip.failure_reason = f"{type(e).__name__}: {e}"
+                clip.status_reason = f"{type(e).__name__}: {e}"
                 ctx.error(f"Failed to transform clip: {str(clip.id[:8])}")
                 if ctx.flags.strict:
                     ctx.error(f"{type(e).__name__}: {e}")

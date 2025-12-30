@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -8,13 +9,28 @@ from domain.stage import Stage, StageGroup
 
 
 def write_clips_json(ctx: PipelineContext, state: ClipState = None) -> None:
-    clips = ctx.clip.clips_in_state(state) if state else ctx.clip.clips
+    bucket = defaultdict(list)
+
+    for clip in ctx.clip.clips:
+        bucket[clip.state].append(clip)
+
+    groups = {}
+
+    for status in ClipState:
+        clips_in_state = bucket.get(status, [])
+        if not clips_in_state:
+            continue
+
+        groups[status.value] = {
+            "urls": {c.id: c.metadata.url for c in clips_in_state},
+            "clips": {c.id: c.to_dict() for c in clips_in_state},
+        }
 
     payload = {
         "generated_at": datetime.now().isoformat(),
-        "clip_count": len(clips),
+        "clip_count": len(ctx.clip.clips),
         "count_by_state": ctx.clip.count_clips_by_state(),
-        "clips": [c.to_dict() for c in clips],
+        "groups": groups,
     }
 
     out_path = Path(ctx.run_config.OUTPUT_FULL_PATH) / "clips.json"
@@ -48,7 +64,7 @@ class SelectStage(Stage):
             clip.state = ClipState.SELECTED
 
         try:
-            write_clips_json(ctx, ClipState.SELECTED)
+            write_clips_json(ctx)
         except Exception as e:
             ctx.error(f"Failed to write clips.json file. Error: {e}")
             raise

@@ -102,7 +102,7 @@ class DiscoverStage(Stage):
             videos_resp = (
                 youtube.videos()
                 .list(
-                    part="snippet,contentDetails,statistics",
+                    part="snippet,contentDetails,statistics,status",
                     id=",".join(video_ids),
                 )
                 .execute()
@@ -122,11 +122,19 @@ class DiscoverStage(Stage):
             duration_sec = int(
                 isodate.parse_duration(video["contentDetails"]["duration"]).total_seconds()
             )
-            age_restricted = (
-                video["contentDetails"].get("contentRating", {}).get("ytRating")
+            description = video["snippet"].get("description", "").lower()
+            region_restriction = video.get("contentDetails", {}).get("regionRestriction", {})
+            blocked = region_restriction.get("blocked")
+            allowed = region_restriction.get("allowed")
+
+            is_age_restricted = (
+                video.get("contentDetails", {}).get("contentRating", {}).get("ytRating")
                 == "ytAgeRestricted"
             )
-            description = video["snippet"].get("description", "").lower()
+
+            is_region_blocked_us = ((blocked is not None and "US" in blocked) or (allowed is not None and "US" not in allowed))
+            is_public = "public" == video.get("status", {}).get("privacyStatus")
+            is_licensed = video.get("contentDetails", {}).get("licensedContent", False)
 
             candidate_pool.append(
                 Clip(
@@ -142,7 +150,10 @@ class DiscoverStage(Stage):
                         upload_date=upload_date,
                         view_count=view_count,
                         duration=duration_sec,
-                        age_restricted=age_restricted,
+                        is_age_restricted=is_age_restricted,
+                        is_region_blocked_us=is_region_blocked_us,
+                        is_public=is_public,
+                        is_licensed=is_licensed,
                     ),
                 )
             )

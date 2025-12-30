@@ -4,16 +4,8 @@ KEYWORD_CONFIG: dict[str, KeywordConfig] = {
     "cat": KeywordConfig(
         query_include=[
             "cat",
-            "cats",
-            "kitten",
-            "kittens",
-            "cat shorts",
-            "funny cat",
-            "funny cats",
-            "cat videos",
-            "shorts",
         ],
-        query_exclude=["catfish", "catfishing", "caterpillar", "scan"],
+        query_exclude=[],
         thumbnail_emojis=["😺", "🐾", "😻"],
         title_emojis=["😺"],
         description_emojis=["🐾"],

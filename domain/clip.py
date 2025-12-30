@@ -19,7 +19,7 @@ class ClipState(str, Enum):
 
     Typical progression (conceptual):
     - DISCOVERED  -> hydrated candidate metadata exists
-    - REJECTED    -> filtered candidate
+    - FILTERED    -> filtered candidate
     - CULLED      -> deduped candidate
     - ELIGIBLE    -> passed hard gates (shape/constraints); still not "selected"
     - SELECTED    -> chosen for downstream execution (exactly target_count)
@@ -29,7 +29,8 @@ class ClipState(str, Enum):
     - PERSISTED  -> persisted clip metadata and runlog
 
     Terminal / exceptional states:
-    - REJECTED    -> failed a hard gate (reason should be recorded)
+    - FILTERED    -> failed a hard gate (reason should be recorded)
+    - CULLED      -> failed a hard gate (reason should be recorded)_
     - FAILED      -> stage execution error (reason + stage should be recorded)
 
     Notes:
@@ -38,7 +39,7 @@ class ClipState(str, Enum):
     """
 
     DISCOVERED = "DISCOVERED"
-    REJECTED = "REJECTED"
+    FILTERED = "FILTERED"
     CULLED = "CULLED"
     ELIGIBLE = "ELIGIBLE"
     SELECTED = "SELECTED"
@@ -72,7 +73,10 @@ class ClipMetadata:
     upload_date: str
     view_count: int
     duration: int
-    age_restricted: bool
+    is_age_restricted: bool
+    is_region_blocked_us: bool
+    is_public: bool
+    is_licensed: bool
 
     def __repr__(self) -> str:
         title = (self.title[:60] + "…") if len(self.title) > 60 else self.title
@@ -85,7 +89,10 @@ class ClipMetadata:
             f"url={self.url}, "
             f"view_count={self.view_count}, "
             f"duration={self.duration}s, "
-            f"age_restricted={self.age_restricted}"
+            f"is_age_restricted={self.is_age_restricted}"
+            f"is_region_blocked_us={self.is_region_blocked_us}"
+            f"is_public={self.is_public}"
+            f"is_licensed={self.is_licensed}"
             ")"
         )
 
@@ -99,7 +106,10 @@ class ClipMetadata:
             "url": self.url,
             "view_count": self.view_count,
             "duration": self.duration,
-            "age_restricted": self.age_restricted,
+            "is_age_restricted": self.is_age_restricted,
+            "is_region_blocked_us": self.is_region_blocked_us,
+            "is_public": self.is_public,
+            "is_licensed": self.is_licensed,
         }
 
 
@@ -138,12 +148,12 @@ class Clip:
         self.metadata = metadata
         self.raw_path = raw_path
         self.processed_path = processed_path
-        self.failure_reason: Optional[str] = None
+        self.status_reason: Optional[str] = None
 
     def set_state(self, new_state: ClipState, reason: Optional[str] = None):
         self.state = new_state
         if reason:
-            self.failure_reason = reason
+            self.status_reason = reason
 
     def is_stage_ready(self, stage_state: ClipState) -> bool:
         return self.state == stage_state
@@ -156,7 +166,7 @@ class Clip:
             f"source={self.source.name} "
             f"raw={'Y' if self.raw_path else 'N'} "
             f"processed={'Y' if self.processed_path else 'N'} "
-            f"failure={self.failure_reason or '-'}"
+            f"status_reason={self.status_reason or '-'}"
             f"\nmetadata={self.metadata}>"
         )
 
@@ -165,6 +175,6 @@ class Clip:
             "id": self.id[:8],
             "state": self.state.name,
             "source": self.source.name,
-            "failure_reason": self.failure_reason,
+            "status_reason": self.status_reason,
             "metadata": self.metadata.to_dict(),
         }

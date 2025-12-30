@@ -6,7 +6,7 @@ from domain.stage import Stage, StageGroup
 class FilterStage(Stage):
 
     INPUT_CLIP_STATE = ClipState.ELIGIBLE
-    OUTPUT_CLIP_STATE = ClipState.REJECTED
+    OUTPUT_CLIP_STATE = ClipState.FILTERED
     STAGE_GROUP = StageGroup.DISCOVER
 
     @property
@@ -17,49 +17,35 @@ class FilterStage(Stage):
         return True
 
     def run(self, ctx: PipelineContext) -> None:
-        pass
+        eligible_clips = ctx.clip.clips_in_state(ClipState.ELIGIBLE)
 
+        for clip in eligible_clips:
+            if clip.metadata.duration < ctx.run_config.DURATION_MIN:
+                clip.state = ClipState.FILTERED
+                clip.status_reason = f"too_short: min={ctx.run_config.DURATION_MIN}"
+                continue
 
-"""
-        for video in videos_resp.get("items", []):
-            evaluated += 1
-            duration_sec = int(
-                isodate.parse_duration(video["contentDetails"]["duration"]).total_seconds()
-            )
-            age_restricted = (
-                video["contentDetails"].get("contentRating", {}).get("ytRating")
-                == "ytAgeRestricted"
-            )
+            if clip.metadata.duration > ctx.run_config.DURATION_MAX:
+                clip.state = ClipState.FILTERED
+                clip.status_reason = f"too_long: max={ctx.run_config.DURATION_MAX}"
+                continue
 
-            title = video["snippet"].get("title", "").lower()
-            description = video["snippet"].get("description", "").lower()
-            keyword_match = keyword_in_title_or_description(keyword, title, description)
-            seen = video["id"] in seen_ids
+            if clip.metadata.is_age_restricted:
+                clip.state = ClipState.FILTERED
+                clip.status_reason = "age_restricted"
+                continue
 
-            if duration_sec <= 60 and not age_restricted and keyword_match and not seen:
-                accepted += 1
-                candidate_pool.append(
-                    Clip(
-                        source=ClipSource.YOUTUBE,
-                        state=ClipState.ELIGIBLE,
-                        metadata=ClipMetadata(
-                            id=video["id"],
-                            title=video["snippet"]["title"],
-                            uploader=video["snippet"]["channelTitle"],
-                            channel_id=video["snippet"]["channelId"],
-                            url=f"https://www.youtube.com/watch?v={video['id']}",
-                            upload_date=video["snippet"]["publishedAt"],
-                            view_count=int(video["statistics"].get("viewCount", 0)),
-                            duration=duration_sec,
-                        ),
-                    )
-                )
-                seen_ids.add(video["id"])
+            if clip.metadata.is_region_blocked_us:
+                clip.state = ClipState.FILTERED
+                clip.status_reason = "region_blocked_us"
+                continue
 
-                if len(candidate_pool) >= candidate_goal:
-                    print(
-                        f"✅ Candidate goal reached: {len(candidate_pool)}/{candidate_goal} "
-                        f"(target_count={target_count}, oversample={ctx.run_config.OVERSAMPLE})"
-                    )
-                    break
-"""
+            if not clip.metadata.is_public:
+                clip.state = ClipState.FILTERED
+                clip.status_reason = "private"
+                continue
+
+            if ctx.run_config.FILTER_LICENSED_CONTENT and clip.metadata.is_licensed:
+                clip.state = ClipState.FILTERED
+                clip.status_reason = "licensed"
+                continue

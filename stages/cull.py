@@ -6,7 +6,7 @@ from domain.stage import Stage, StageGroup
 class CullStage(Stage):
 
     INPUT_CLIP_STATE = ClipState.ELIGIBLE
-    OUTPUT_CLIP_STATE = ClipState.REJECTED
+    OUTPUT_CLIP_STATE = ClipState.FILTERED
     STAGE_GROUP = StageGroup.DISCOVER
 
     @property
