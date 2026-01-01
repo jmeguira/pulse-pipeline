@@ -41,6 +41,8 @@ REGION_CODE = os.getenv("REGION_CODE", "us")
 DURATION_MIN = int(os.getenv("DURATION_MIN", 7))
 DURATION_MAX = int(os.getenv("DURATION_MAX", 60))
 FILTER_LICENSED_CONTENT = os.getenv("FILTER_LICENSED_CONTENT", "false").lower() == "true"
+# --- Cull
+CULL_NON_ENGLISH_CONTENT = os.getenv("CULL_NON_ENGLISH_CONTENT", "true").lower() == "true"
 
 # --- Download
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
@@ -121,6 +123,7 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
         DURATION_MIN=DURATION_MIN,
         DURATION_MAX=DURATION_MAX,
         FILTER_LICENSED_CONTENT=FILTER_LICENSED_CONTENT,
+        CULL_NON_ENGLISH_CONTENT=CULL_NON_ENGLISH_CONTENT,
         YDL_OPTS=YDL_OPTS_BASE,
         ENABLE_LUFS=ENABLE_LUFS,
         TARGET_LUFS=TARGET_LUFS,
@@ -142,6 +145,29 @@ def is_group_enabled(ctx: PipelineContext, stage: Stage, group: StageGroup) -> b
     if ctx.flags.dry_run:
         return stage.STAGE_GROUP is group
     return True
+
+
+def summarize_state(clips, state):
+    counts = Counter(
+        clip.status_reason for clip in clips if clip.state == state and clip.status_reason
+    )
+
+    if not counts:
+        return None
+
+    parts = []
+    last_prefix = None
+
+    for reason, count in counts.most_common():
+        prefix = reason.split(":", 1)[0]
+
+        if prefix != last_prefix:
+            parts.append(prefix + ":")
+            last_prefix = prefix
+
+        parts.append(f"{reason.split(':',1)[-1].strip()}={count}")
+
+    return f"{state.value}: " + " ".join(parts)
 
 
 def main_pipeline(ctx: PipelineContext) -> None:
@@ -234,24 +260,14 @@ def main_pipeline(ctx: PipelineContext) -> None:
         duration_s=total_s,
         pool=f"[ {context.clip.count_clips_by_state()} ]",
     )
-    context.log(
-        LogLevel.DEBUG,
-        (
-            " | ".join(
-                f"{state.value}: "
-                + ", ".join(
-                    f"{reason}={count}"
-                    for reason, count in Counter(
-                        (clip.status_reason or "unknown")
-                        for clip in ctx.clip.clips
-                        if clip.state == state
-                    ).items()
-                )
-                for state in (ClipState.FILTERED, ClipState.CULLED, ClipState.FAILED)
-                if any(clip.state == state for clip in ctx.clip.clips)
-            )
-        ),
-    )
+
+    parts = []
+    for state in (ClipState.FILTERED, ClipState.CULLED, ClipState.FAILED):
+        s = summarize_state(ctx.clip.clips, state)
+        if s:
+            parts.append(s)
+
+    context.debug(" | ".join(parts))
 
 
 if __name__ == "__main__":

@@ -28,6 +28,8 @@ class RunConfig:
     DURATION_MIN: int
     DURATION_MAX: int
     FILTER_LICENSED_CONTENT: bool
+    # --- Cull --- #
+    CULL_NON_ENGLISH_CONTENT: bool
     # --- Compilation / Output --- #
     OUTPUT_WIDTH: int
     OUTPUT_HEIGHT: int

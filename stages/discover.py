@@ -136,10 +136,13 @@ class DiscoverStage(Stage):
             is_public = "public" == video.get("status", {}).get("privacyStatus")
             is_licensed = video.get("contentDetails", {}).get("licensedContent", False)
 
+            default_language = video.get("snippet", {}).get("defaultLanguage", None)
+            default_audio_language = video.get("snippet", {}).get("defaultAudioLanguage", None)
+
             candidate_pool.append(
                 Clip(
                     source=ClipSource.YOUTUBE,
-                    state=ClipState.DISCOVERED,
+                    state=ClipState.ELIGIBLE,
                     metadata=ClipMetadata(
                         id=id,
                         title=title,
@@ -154,15 +157,11 @@ class DiscoverStage(Stage):
                         is_region_blocked_us=is_region_blocked_us,
                         is_public=is_public,
                         is_licensed=is_licensed,
+                        default_language=default_language,
+                        default_audio_language=default_audio_language,
                     ),
                 )
             )
-            if len(candidate_pool) >= candidate_goal:
-                ctx.debug(
-                    f"Candidate goal reached: {len(candidate_pool)}/{candidate_goal} "
-                    f"(target_count={target_count}, oversample={ctx.run_config.OVERSAMPLE})"
-                )
-                break
 
         ineligible_clips = ctx.clip.clips_not_in_state(state=ClipState.ELIGIBLE)
         ctx.clip.clips = ineligible_clips + candidate_pool

@@ -77,6 +77,8 @@ class ClipMetadata:
     is_region_blocked_us: bool
     is_public: bool
     is_licensed: bool
+    default_language: str
+    default_audio_language: str
 
     def __repr__(self) -> str:
         title = (self.title[:60] + "…") if len(self.title) > 60 else self.title
@@ -89,10 +91,6 @@ class ClipMetadata:
             f"url={self.url}, "
             f"view_count={self.view_count}, "
             f"duration={self.duration}s, "
-            f"is_age_restricted={self.is_age_restricted}"
-            f"is_region_blocked_us={self.is_region_blocked_us}"
-            f"is_public={self.is_public}"
-            f"is_licensed={self.is_licensed}"
             ")"
         )
 
@@ -110,6 +108,8 @@ class ClipMetadata:
             "is_region_blocked_us": self.is_region_blocked_us,
             "is_public": self.is_public,
             "is_licensed": self.is_licensed,
+            "default_language": self.default_language,
+            "default_audio_language": self.default_audio_language,
         }
 
 
