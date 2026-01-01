@@ -17,6 +17,10 @@ class RunConfig:
     OVERSAMPLE: int
     CANDIDATE_GOAL: int
     YOUTUBE_API_KEY: str
+    YOUTUBE_API_MAX_ATTEMPTS: int
+    YOUTUBE_API_BASE_DELAY_S: float
+    YOUTUBE_API_MAX_DELAY_S: float
+    YOUTUBE_API_JITTER_PCT: float
     YDL_OPTS: dict
     # --- Discover --- #
     BATCH_SIZE: int

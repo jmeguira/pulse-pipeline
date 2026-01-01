@@ -72,23 +72,6 @@ class PipelineContext:
             f"pool={self.clip.count_clips_by_state()}"
         )
 
-    def debug_state(self) -> str:
-        return "\n".join(
-            [
-                "-" * 48,
-                "PIPELINE STATE",
-                f"keyword           : {self.run_config.KEYWORD}",
-                f"target_count      : {self.run_config.TARGET_COUNT}",
-                f"published_after   : {self.run_config.PUBLISHED_AFTER}",
-                f"published_before  : {self.run_config.PUBLISHED_BEFORE}",
-                f"cursor            : {self.acquire.cursor}",
-                f"pages_processed   : {self.acquire.pages_processed}",
-                "clip_counts:",
-                self.clip.count_clips_by_state(),
-                "-" * 48,
-            ]
-        )
-
     def log(self, level: LogLevel, msg: str, **fields) -> None:
         if level > self.flags.log_level:
             return

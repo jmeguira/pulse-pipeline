@@ -3,15 +3,10 @@ from datetime import datetime, timezone, timedelta
 import isodate
 from googleapiclient.discovery import build
 
+from clients.youtube import build_query
 from domain.clip import ClipState, Clip, ClipMetadata, ClipSource
 from domain.pipeline_context import PipelineContext
 from domain.stage import Stage, StageGroup
-
-
-def build_query(ctx: PipelineContext) -> str:
-    include = " ".join(ctx.run_config.KEYWORD_CONFIG.query_include)
-    exclude = " ".join(f"-{term}" for term in ctx.run_config.KEYWORD_CONFIG.query_exclude)
-    return f"{include} {exclude}".strip()
 
 
 class DiscoverStage(Stage):
@@ -61,7 +56,7 @@ class DiscoverStage(Stage):
             search_resp = (
                 youtube.search()
                 .list(
-                    q=build_query(ctx),
+                    q=build_query(ctx.run_config.KEYWORD_CONFIG),
                     type="video",
                     part="id",
                     maxResults=min(batch_size, 50),

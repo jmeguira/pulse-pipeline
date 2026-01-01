@@ -48,6 +48,10 @@ CULL_NON_ENGLISH_CONTENT = os.getenv("CULL_NON_ENGLISH_CONTENT", "true").lower()
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 if not YOUTUBE_API_KEY:
     raise RuntimeError("Missing YOUTUBE_API_KEY. Set it in .env or your environment.")
+YOUTUBE_API_MAX_ATTEMPTS = int(os.getenv("YOUTUBE_API_MAX_ATTEMPTS", 7))
+YOUTUBE_API_BASE_DELAY_S = float(os.getenv("YOUTUBE_API_BASE_DELAY_S", 0.8))
+YOUTUBE_API_MAX_DELAY_S = float(os.getenv("YOUTUBE_API_MAX_DELAY_S", 30.0))
+YOUTUBE_API_JITTER_PCT = float(os.getenv("YOUTUBE_API_JITTER_PCT", 0.25))
 
 YDL_FORMAT = os.getenv("YDL_FORMAT", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best")
 YDL_NO_PLAYLIST = os.getenv("YDL_NO_PLAYLIST", "true").lower() == "true"
