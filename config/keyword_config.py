@@ -22,7 +22,7 @@ KEYWORD_CONFIG: dict[str, KeywordConfig] = {
         hashtags=["#funny", "#comedy", "#lol", "#viral"],
     ),
     "gaming": KeywordConfig(
-        query_include=[],
+        query_include=["gaming"],
         query_exclude=[],
         thumbnail_emojis=["🎮", "🔥", "💥"],
         title_emojis=["🎮"],
@@ -31,7 +31,7 @@ KEYWORD_CONFIG: dict[str, KeywordConfig] = {
         hashtags=["#gaming", "#gamingshorts", "#gamer", "#viral"],
     ),
     "dogs": KeywordConfig(
-        query_include=[],
+        query_include=["dog"],
         query_exclude=[],
         thumbnail_emojis=["🐶", "🐾", "❤️"],
         title_emojis=["🐶"],

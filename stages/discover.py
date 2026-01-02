@@ -3,7 +3,7 @@ from datetime import datetime, timezone, timedelta
 import isodate
 from googleapiclient.discovery import build
 
-from clients.youtube import build_query
+from clients.youtube import build_query, youtube_execute
 from domain.clip import ClipState, Clip, ClipMetadata, ClipSource
 from domain.pipeline_context import PipelineContext
 from domain.stage import Stage, StageGroup
@@ -51,26 +51,22 @@ class DiscoverStage(Stage):
             f"  ➤ Page {ctx.acquire.pages_processed}/{max_pages} | candidates: {len(candidate_pool)}/{candidate_goal} |"
             f" target_count={target_count}"
         )
+        search_request = youtube.search().list(
+            q=build_query(ctx.run_config.KEYWORD_CONFIG),
+            type="video",
+            part="id",
+            maxResults=min(batch_size, 50),
+            publishedAfter=published_after,
+            publishedBefore=published_before,
+            videoDuration="short",
+            order=ctx.run_config.ORDER,
+            relevanceLanguage=ctx.run_config.RELEVANCE_LANGUAGE,
+            regionCode=ctx.run_config.REGION_CODE,
+            pageToken=ctx.acquire.cursor,
+        )
 
         try:
-            search_resp = (
-                youtube.search()
-                .list(
-                    q=build_query(ctx.run_config.KEYWORD_CONFIG),
-                    type="video",
-                    part="id",
-                    maxResults=min(batch_size, 50),
-                    publishedAfter=published_after,
-                    publishedBefore=published_before,
-                    videoDuration="short",
-                    order=ctx.run_config.ORDER,
-                    relevanceLanguage=ctx.run_config.RELEVANCE_LANGUAGE,
-                    regionCode=ctx.run_config.REGION_CODE,
-                    pageToken=ctx.acquire.cursor,
-                )
-                .execute()
-            )
-
+            search_resp = youtube_execute(ctx, search_request)
         except Exception as e:
             ctx.error(f"Error: YouTube search failed on page {ctx.acquire.pages_processed + 1}"
                       f" (token={ctx.acquire.cursor}): {e}")
@@ -93,15 +89,12 @@ class DiscoverStage(Stage):
             )
             return
 
-        try:
-            videos_resp = (
-                youtube.videos()
-                .list(
+        videos_request = youtube.videos().list(
                     part="snippet,contentDetails,statistics,status",
                     id=",".join(video_ids),
                 )
-                .execute()
-            )
+        try:
+            videos_resp = youtube_execute(ctx, videos_request)
         except Exception as e:
             ctx.error(f"Error: videos.list failed for {len(video_ids)} ids on page {ctx.acquire.pages_processed}: {e}")
             raise

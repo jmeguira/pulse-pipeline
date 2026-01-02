@@ -33,11 +33,11 @@ class CullStage(Stage):
             lang = clip.metadata.default_language
             if cull_non_english and lang and not is_english(lang):
                 clip.state = ClipState.CULLED
-                clip.status_reason = f"non_english_default_language: {lang}"
+                clip.status_reason = "non_english_default_language"
                 continue
 
             audio_lang = clip.metadata.default_audio_language
             if cull_non_english and audio_lang and not is_english(audio_lang):
                 clip.state = ClipState.CULLED
-                clip.status_reason = f"non_english_audio_language: {audio_lang}"
+                clip.status_reason = "non_english_audio_language"
                 continue

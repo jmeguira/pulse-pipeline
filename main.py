@@ -57,7 +57,10 @@ YDL_FORMAT = os.getenv("YDL_FORMAT", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best
 YDL_NO_PLAYLIST = os.getenv("YDL_NO_PLAYLIST", "true").lower() == "true"
 YDL_IGNORE_ERRORS = os.getenv("YDL_IGNORE_ERRORS", "true").lower() == "true"
 YDL_COOKIEFILE = os.getenv("YDL_COOKIEFILE", "cookies.txt")
-YDL_RETRIES = int(os.getenv("YDL_RETRIES", 3))
+YDL_RETRIES = int(os.getenv("YDL_RETRIES", 7))
+YDL_FRAGMENT_RETRIES = int(os.getenv("YDL_FRAGMENT_RETRIES", 7))
+YDL_EXTRACTOR_RETRIES = int(os.getenv("YDL_EXTRACTOR_RETRIES", 3))
+YDL_SOCKET_TIMEOUT = int(os.getenv("YDL_SOCKET_TIMEOUT", 30))
 YDL_SLEEP_INTERVAL = float(os.getenv("YDL_SLEEP_INTERVAL", 0))
 YDL_MAX_SLEEP_INTERVAL = float(os.getenv("YDL_MAX_SLEEP_INTERVAL", 5))
 YDL_MERGE_FORMAT = os.getenv("YDL_MERGE_FORMAT", "mp4")
@@ -71,6 +74,9 @@ YDL_OPTS_BASE = {
     "ignoreerrors": YDL_IGNORE_ERRORS,
     "cookiefile": YDL_COOKIEFILE,
     "retries": YDL_RETRIES,
+    "fragment_retries": YDL_FRAGMENT_RETRIES,
+    "extractor_retries": YDL_EXTRACTOR_RETRIES,
+    "socket_timeout": YDL_SOCKET_TIMEOUT,
     "sleep_interval_requests": YDL_SLEEP_INTERVAL,
     "max_sleep_interval": YDL_MAX_SLEEP_INTERVAL,
     "merge_output_format": YDL_MERGE_FORMAT,
@@ -124,6 +130,10 @@ def build_run_config(keyword_choices: list[str]) -> RunConfig:
         RELEVANCE_LANGUAGE=RELEVANCE_LANGUAGE,
         REGION_CODE=REGION_CODE,
         YOUTUBE_API_KEY=YOUTUBE_API_KEY,
+        YOUTUBE_API_MAX_ATTEMPTS=YOUTUBE_API_MAX_ATTEMPTS,
+        YOUTUBE_API_BASE_DELAY_S=YOUTUBE_API_BASE_DELAY_S,
+        YOUTUBE_API_MAX_DELAY_S=YOUTUBE_API_MAX_DELAY_S,
+        YOUTUBE_API_JITTER_PCT=YOUTUBE_API_JITTER_PCT,
         DURATION_MIN=DURATION_MIN,
         DURATION_MAX=DURATION_MAX,
         FILTER_LICENSED_CONTENT=FILTER_LICENSED_CONTENT,
@@ -149,29 +159,6 @@ def is_group_enabled(ctx: PipelineContext, stage: Stage, group: StageGroup) -> b
     if ctx.flags.dry_run:
         return stage.STAGE_GROUP is group
     return True
-
-
-def summarize_state(clips, state):
-    counts = Counter(
-        clip.status_reason for clip in clips if clip.state == state and clip.status_reason
-    )
-
-    if not counts:
-        return None
-
-    parts = []
-    last_prefix = None
-
-    for reason, count in counts.most_common():
-        prefix = reason.split(":", 1)[0]
-
-        if prefix != last_prefix:
-            parts.append(prefix + ":")
-            last_prefix = prefix
-
-        parts.append(f"{reason.split(':',1)[-1].strip()}={count}")
-
-    return f"{state.value}: " + " ".join(parts)
 
 
 def main_pipeline(ctx: PipelineContext) -> None:
@@ -265,13 +252,24 @@ def main_pipeline(ctx: PipelineContext) -> None:
         pool=f"[ {context.clip.count_clips_by_state()} ]",
     )
 
-    parts = []
-    for state in (ClipState.FILTERED, ClipState.CULLED, ClipState.FAILED):
-        s = summarize_state(ctx.clip.clips, state)
-        if s:
-            parts.append(s)
-
-    context.debug(" | ".join(parts))
+    context.log(
+        LogLevel.DEBUG,
+        (
+            " | ".join(
+                f"{state.value}: "
+                + ", ".join(
+                    f"{reason}={count}"
+                    for reason, count in Counter(
+                        (clip.status_reason or "unknown")
+                        for clip in ctx.clip.clips
+                        if clip.state == state
+                    ).items()
+                )
+                for state in (ClipState.FILTERED, ClipState.CULLED, ClipState.FAILED)
+                if any(clip.state == state for clip in ctx.clip.clips)
+            )
+        ),
+    )
 
 
 if __name__ == "__main__":
