@@ -1,23 +1,20 @@
-# Product Roadmap — Pulse (Updated)
+# Roadmap — Pulse
+
+> **Archived.** This is the build log as it stood when I closed the project.
+> Phases marked in-progress were the live work at the time of archive, not
+> ongoing commitments.
 
 ---
 
-## 🧭 Compass — Current Orientation
+## Orientation (at archive)
 
-**What Pulse is**
+**What Pulse was**
 
-- A system that **samples what’s resonating within a defined time window** for a topic and renders it as video.
+- A system that **samples what's resonating within a defined time window** for a topic and renders it as video.
 - **Observational, time-bounded, and lightweight** by design.
 - Built to explore **theme × time slices**, not to declare importance or predict outcomes.
 
-**What matters right now**
-
-- Maintain a **wide top-of-funnel** while cheaply testing acquisition quality.
-- Optimize for **shipping real artifacts** and observing feedback.
-- Bias toward **subtraction and legibility** over feature growth.
-- Treat the system explicitly as an **experiment**, not a production commitment.
-
-**What Pulse is not (yet)**
+**What it was not**
 
 - Not a generalized or scalable engine.
 - Not a recommendation or relevance model.
@@ -35,15 +32,15 @@
 
 ---
 
-## Status Summary (Current)
+## Status at archive
 
-- Pipeline runs **end-to-end** and produces inspectable artifacts.
-- DISCOVER loop is fast, configurable, and human-inspectable.
-- Execution volume is controlled via an explicit `SELECTED` boundary.
-- Infra, logging, flags, and failure semantics are stable.
-- Current active work:
-    - **Acquisition tightening**
-    - **Editing subtraction / simplification**
+- Pipeline ran **end-to-end** and produced inspectable artifacts.
+- DISCOVER loop was fast, configurable, and human-inspectable.
+- Execution volume controlled via an explicit `SELECTED` boundary.
+- Infra, logging, flags, and failure semantics stable.
+- Live work at the time of stopping:
+    - **Acquisition tightening** (Phase 4)
+    - **Editing subtraction / simplification** (Phase 5)
 
 ---
 
@@ -208,9 +205,13 @@ These are intentionally parked, not abandoned:
 
 ---
 
-## Current Priority Window (Canonical)
+## Priority window at archive
 
 1. Phase 4 — FILTER + CULL
 2. Phase 5 — Editing subtraction
 3. Ship artifacts, observe friction
 4. Re-evaluate next expansion point
+
+The re-evaluation in step 4 is what closed the project: the architecture had
+landed where I wanted it, and the next interesting questions were no longer
+about the pipeline.
