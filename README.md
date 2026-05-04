@@ -62,6 +62,11 @@ state they consume and which they produce. A clip going from `DISCOVERED` to
 Persist before clean. Stages don't clobber unrelated state. Idempotency is
 the default rather than an afterthought.
 
+**Make low-yield runs legible.**
+Per-stage timing, rejection reasons by category, and explicit discovery
+exit conditions all land in the log. "Why did this run return so few
+clips?" should be answerable without re-running.
+
 ---
 
 ## Pipeline shape
