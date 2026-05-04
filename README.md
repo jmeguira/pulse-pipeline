@@ -91,6 +91,47 @@ spend money on downloads.
 
 ---
 
+## What I ran into
+
+The hardest part of this project wasn't the pipeline — it was the upstream.
+
+YouTube's Data API and discovery surface are not built for what Pulse is
+trying to do. They're built for "find videos like the ones this user already
+watches," not "give me a clean cross-section of what's resonating around a
+theme in a time window." A few things that came out of running this for
+real:
+
+- **Rate limits bite before signal does.** The daily quota is generous on
+  paper but tight in practice once you're hydrating full metadata for every
+  candidate. I was getting throttled before I'd combed through enough
+  candidates to find the viable ones.
+- **The result set is mostly slop.** Across keywords, the accept rate after
+  hard gates was low. Discovery returns a lot of recycled, low-effort, or
+  off-theme content even with date and language constraints. The
+  oversample-then-filter design exists because the noise floor is that high.
+- **Discovery actively works against this use case.** Search results lean
+  heavily on engagement and personalization signals that you can't really
+  turn off. Asking "what's resonating *in this window*, independent of who
+  I am" is not a query the API really wants to answer — you can approximate
+  it with `order=date` + region + language, but you're working around the
+  product, not with it.
+
+None of this is a complaint about YouTube — they have no incentive to make
+bulk theme-sampling easy. But it's the reason a lot of the architectural
+choices here are defensive: bound everything, fail loud when the funnel
+underperforms, and assume the upstream is going to push back.
+
+This was also the decision point that closed the project. The obvious next
+move to push past the funnel limits would have been to lean on scraping,
+rotating identities, or other gray-area workarounds. Each of those would
+have traded a repeatable, well-behaved system for a brittle one whose
+correctness depended on staying one step ahead of detection. I wasn't
+willing to make that trade — the value of Pulse was in the architecture and
+the artifacts it produced, not in winning an arms race against a platform
+I had no business fighting.
+
+---
+
 ## Repository layout
 
 - `domain/` — `Clip`, `ClipState`, `ClipMetadata`, `PipelineContext`, run config, runtime flags
