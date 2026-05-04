@@ -1,118 +1,150 @@
-# Pulse Check
+# Pulse
 
-**Signal-first video discovery, filtering, and compilation.**
+A state-driven pipeline that samples short-form video around a theme inside a
+time window, filters aggressively for signal, and renders the result into a
+single compiled artifact.
 
-Pulse Check is an internal, operator-driven content pipeline designed to tap into internet throughput around a specific
-thematic cluster, refine the signal, and produce high-quality compiled outputs. Public consumption is optional and
-explicitly not the goal at this stage.
-
----
-
-## What this is
-
-Pulse Check is a **single-run, state-driven pipeline** that:
-
-- discovers candidate short-form video content,
-- filters and deduplicates aggressively,
-- scores and selects only what’s worth spending resources on,
-- executes expensive steps deterministically,
-- records provenance,
-- and cleans up after itself.
-
-It is built to be **boring to rerun**, diagnosable when it fails, and extensible without refactoring the core.
+> **Status: archived.** Pulse ran end-to-end and produced real output. I closed
+> it as an experiment after Phase 4 — the architecture got where I wanted it
+> to, and the next interesting questions were no longer about the pipeline.
 
 ---
 
-## Core principles
+## What it actually does
 
-- **Signal > volume**
-  The internet is infinite; discovery must be bounded and intentional.
+Given a keyword and a date range, Pulse:
 
-- **Separate the questions**
-  Each stage answers exactly one question:
-    - *What exists?*
-    - *What is allowed?*
-    - *Have we seen this before?*
-    - *How good is it?*
-    - *What is worth doing work on?*
+1. Searches YouTube for short-form videos published inside the window
+2. Hydrates each candidate with full metadata (duration, language, region, licensing, age gates)
+3. Filters out anything that fails hard constraints
+4. Culls non-English and intra-run duplicates
+5. Selects exactly `target_count` clips for execution
+6. Downloads, normalizes audio, transforms to a standard frame, and compiles into one video
+7. Writes a `clips.json` provenance record next to the output
 
-- **Judgment enters late**
-  Hard gates first, ranking later, resource commitment last.
-
-- **Rerun safety is a feature**
-  Idempotency and explicit state transitions are not optional.
+One run, one artifact. Configurable by `.env` and `flags.json`. Inspectable
+between stages. Boring to rerun.
 
 ---
 
-### Stage intent (brief)
+## Why I built it the way I did
 
-- **Discover** — enumerate and hydrate candidates (bounded)
-- **Filter** — hard pass/fail gates only
-- **Dedup** — remove repeats relative to pool/history
-- **Score** — attach score components (never rejects)
-- **Select** — choose exactly `target_count`
-- **Download / Preprocess / Compile** — artifact-producing execution
-- **Persist** — write run outcomes and provenance
-- **Clean** — remove temporary/intermediate artifacts
+The interesting design problem here was not "can you stitch videos together"
+— that's a weekend. It was: how do you build a pipeline against an *infinite,
+noisy* source where most of the work is throwing things away, and you need to
+stay sane when reruns disagree with each other?
 
----
+The shape of the answer ended up being:
 
-## Core domain objects
+**Separate the questions, one per stage.**
+Each stage answers exactly one thing: *what exists?*, *what's allowed?*,
+*have we seen this before?*, *how good is it?*, *what's worth working on?*.
+Mixing those questions is what makes pipelines unmaintainable.
 
-- **Clip**
-  Run-scoped unit of content carrying source, metadata, lifecycle state, and artifact paths.
+**Judgment enters late.**
+Hard gates first (Filter), ranking later (Score), resource commitment last
+(Select → Download). Anything expensive happens after the cheap rejections.
+This is also why Score is forbidden from rejecting — it would re-tangle the
+gating contract.
 
-- **ClipState**
-  Defines stage contracts and lifecycle transitions.
+**Bound the discovery loop.**
+The internet is infinite; discovery has to stop somewhere on purpose.
+`target_count × OVERSAMPLE = candidate_goal`, capped by `MAX_PAGES`. Every
+run logs why it stopped (goal hit, page cap, end of results) so a low-yield
+run is diagnosable instead of mysterious.
 
-- **PipelineContext**
-  Holds run configuration and the working clip set for the entire run.
+**Make state explicit.**
+Every clip is in exactly one `ClipState` at any time. Stages declare which
+state they consume and which they produce. A clip going from `DISCOVERED` to
+`COMPILED` leaves a trail of state transitions, not vibes.
 
----
-
-## Discovery bounds
-
-Pulse Check enforces explicit limits to prevent runaway ingestion:
-
-- `target_count` — how many clips you ultimately want
-- `OVERSAMPLE` — multiplier to ensure a sufficient candidate pool
-- `candidate_goal = target_count * OVERSAMPLE`
-- `MAX_PAGES` — hard cap on discovery pagination
-
-Diagnostics (evaluated count, accepted count, accept rate) are logged to explain low-yield runs.
+**Reruns are a feature, not an emergency.**
+Persist before clean. Stages don't clobber unrelated state. Idempotency is
+the default rather than an afterthought.
 
 ---
 
-## Invariants / guardrails
+## Pipeline shape
 
-- Discovery is always bounded.
-- Filter is hard-gate only; Score never rejects.
-- Clip count may only shrink after Filter and Select.
-- Execution stages must be idempotent.
-- Persist runs **before** Clean.
-- Stages must not clobber unrelated clip states on rerun.
+```
+   ┌──────────── acquisition loop ─────────────┐
+   │                                           │
+   ▼                                           │
+Discover ──► Filter ──► Cull ──► (goal hit?) ──┘
+                                     │
+                                     ▼
+                                  Score
+                                     │
+                                     ▼
+                                  Select
+                                     │
+                                     ▼
+                          Download ──► Transform ──► Compile
+                                                       │
+                                                       ▼
+                                                    Persist
+```
 
----
-
-## Repository structure (high level)
-
-- `domain/` — Clip, ClipState, metadata, stage contracts
-- `stages/` — pipeline stage implementations
-- `config/` — run configuration and defaults
-- `utils/` — shared helpers (date logic, matching, etc.)
-- `docs/` — architecture and roadmap
-- `main.py` — pipeline entrypoint
-
----
-
-## Status
-
-This project is **actively evolving** and intentionally internal.
-The north star is a sharp, reliable content pipeline. Everything else is secondary.
+Acquisition keeps looping until the eligible pool reaches `candidate_goal`,
+the page cap is hit, or YouTube runs out of results. Only then does the run
+spend money on downloads.
 
 ---
 
-## Naming note
+## What I ran into
 
-“Pulse Check” is a working name used to replace placeholders and clarify documentation.
-It implies *tuning for signal*, not branding commitment.
+The hardest part wasn't the pipeline — it was the upstream. YouTube's API
+and discovery surface aren't built for "give me a clean cross-section of
+what's resonating around a theme in a time window," and it shows:
+
+- **Rate limits bite before signal does.** Quota gets tight fast once you're
+  hydrating full metadata, and throttling kicked in before the funnel had
+  surfaced enough viable candidates.
+- **The result set is mostly slop.** Accept rates after hard gates were low
+  across keywords. The oversample-then-filter design exists because the
+  noise floor is that high.
+- **The tuning levers don't surface signal.** The knobs the API exposes —
+  date range, region, language, order — aren't enough to pull a clean
+  cross-section out of the result set. Even with all of them set
+  thoughtfully, what comes back skews heavily toward whatever the discovery
+  layer is already amplifying, which isn't the same thing as what's
+  actually resonating in the window.
+
+This was the decision point that closed the project. The paths past those
+limits — scraping, rotating identities, gray-area workarounds — would have
+traded a repeatable system for a brittle one in an arms race against
+detection. Not a trade I was willing to make.
+
+---
+
+## Repository layout
+
+- `domain/` — `Clip`, `ClipState`, `ClipMetadata`, `PipelineContext`, run config, runtime flags
+- `stages/` — one file per pipeline stage; each implements the `Stage` contract
+- `clients/` — YouTube API wrapper with retry/backoff
+- `config/` — keyword configuration (the primary acquisition surface)
+- `utils/` — shared helpers (date logic, prompts, compile/preprocess utilities)
+- `main.py` — entrypoint and stage orchestrator
+- `roadmap.md` — phase-by-phase build log and parked work
+
+---
+
+## What I'd do next (if I picked it back up)
+
+The roadmap captures the full list, but the live ones at archive time were:
+
+- **Selection quality** — moving from a naive heuristic to lightweight scoring
+  (views/day, engagement ratios) and basic diversity constraints. The scaffolding
+  is in place; the policy isn't.
+- **Editing subtraction** — Phase 5 was halfway through stripping value-negative
+  edit work (title cards, transitions, countdowns) so compilation could become a
+  neutral container instead of a performance.
+- **Determinism across reruns** — accepted debt; the pipeline is rerun-*safe*
+  but not yet rerun-*identical*.
+
+---
+
+## Naming
+
+"Pulse" is a working name. It implies tuning for signal, not branding
+commitment.

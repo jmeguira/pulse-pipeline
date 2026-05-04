@@ -245,14 +245,14 @@ def main_pipeline(ctx: PipelineContext) -> None:
         ctx.debug("Exiting stage", stage=stage.name, duration_s=dt_s)
 
     total_s = round(time.perf_counter() - t_run_start, 3)
-    context.log(
+    ctx.log(
         LogLevel.NORMAL,
         "Run complete",
         duration_s=total_s,
-        pool=f"[ {context.clip.count_clips_by_state()} ]",
+        pool=f"[ {ctx.clip.count_clips_by_state()} ]",
     )
 
-    context.log(
+    ctx.log(
         LogLevel.DEBUG,
         (
             " | ".join(
